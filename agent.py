@@ -13,12 +13,42 @@ Build and test your three tools in `tools.py` first. Then come here.
     python agent.py          runs both example paths below
 """
 
+import json
 import re
 
 import config
 import trace
-from tools import search_listings, suggest_outfit, create_fit_card
+from tools import search_listings, suggest_outfit, create_fit_card, compare_price
 from generate import ModelUnavailable
+
+# Style memory (stretch): where the wardrobe gets saved between runs.
+# Per-user state, not shared data, so it's gitignored.
+SAVED_WARDROBE_PATH = config.DATA_DIR / "saved_wardrobe.json"
+
+
+def load_saved_wardrobe(fallback: dict) -> dict:
+    """Load the wardrobe saved from a previous run, or use `fallback` if none exists."""
+    if SAVED_WARDROBE_PATH.exists():
+        return json.loads(SAVED_WARDROBE_PATH.read_text(encoding="utf-8"))
+    return fallback
+
+
+def _remember_wardrobe_item(wardrobe: dict, item: dict) -> None:
+    """Add the newly thrifted item to the wardrobe and persist it to disk."""
+    wardrobe_item = {
+        "id": f"w_{item['id']}",
+        "name": item["title"],
+        "category": item["category"],
+        "colors": item["colors"],
+        "style_tags": item["style_tags"],
+        "notes": f"Thrifted from {item['platform']} for ${item['price']:.2f}",
+    }
+    existing_ids = {w["id"] for w in wardrobe["items"]}
+    if wardrobe_item["id"] not in existing_ids:
+        wardrobe["items"].append(wardrobe_item)
+
+    config.DATA_DIR.mkdir(exist_ok=True)
+    SAVED_WARDROBE_PATH.write_text(json.dumps(wardrobe, indent=2), encoding="utf-8")
 
 # How the query is parsed: regex. Catches "under $30" / "under 30" for a
 # price ceiling and "size M" / "size 8" / "size XXS" for a size. Known
@@ -72,6 +102,7 @@ def new_session(query: str, wardrobe: dict) -> dict:
         "selected_item": None,       # the one you chose — goes into suggest_outfit
         "wardrobe": wardrobe,        # the user's wardrobe
         "outfit_suggestion": None,   # what suggest_outfit returned
+        "price_comparison": None,    # what compare_price returned (stretch)
         "fit_card": None,            # what create_fit_card returned
         "error": None,               # set when the run ended early
     }
@@ -158,14 +189,22 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         return session
 
     session["selected_item"] = session["search_results"][0]
+    session["price_comparison"] = compare_price(session["selected_item"])
 
-    session["outfit_suggestion"] = suggest_outfit(
-        session["selected_item"], session["wardrobe"]
-    )
+    # ── SECOND BRANCH (stretch): the model being unreachable is a different
+    # condition than an empty search, and needs its own stop. ──
+    try:
+        session["outfit_suggestion"] = suggest_outfit(
+            session["selected_item"], session["wardrobe"]
+        )
+        session["fit_card"] = create_fit_card(
+            session["outfit_suggestion"], session["selected_item"]
+        )
+    except ModelUnavailable as exc:
+        session["error"] = str(exc)
+        return session
 
-    session["fit_card"] = create_fit_card(
-        session["outfit_suggestion"], session["selected_item"]
-    )
+    _remember_wardrobe_item(session["wardrobe"], session["selected_item"])
 
     return session
 

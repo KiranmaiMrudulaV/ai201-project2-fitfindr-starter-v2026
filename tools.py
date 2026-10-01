@@ -250,3 +250,44 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
         "and platform once, and be specific about the vibe."
     )
     return generate(prompt)
+
+
+# ── Tool 4 (stretch): compare_price ───────────────────────────────────────────
+
+def compare_price(item: dict) -> str:
+    """
+    Compare a listing's price to the average price of other listings in the
+    same category.
+
+    This is the fourth, stretch tool. It doesn't call the model — it's a
+    plain calculation over the listings data, same spirit as search_listings.
+
+    Args:
+        item: a listing dict — the item to compare.
+
+    Returns:
+        A string describing how the item's price compares to the category
+        average (e.g. "$4.00 below the $22.00 average for tops").
+        If item is the only listing in its category, returns a message
+        saying there's nothing to compare against — never divides by zero.
+    """
+    others = [
+        listing
+        for listing in load_listings()
+        if listing["category"] == item["category"] and listing["id"] != item["id"]
+    ]
+
+    if not others:
+        return (
+            f"No other {item['category']} listings to compare "
+            f"${item['price']:.2f} against."
+        )
+
+    average = sum(listing["price"] for listing in others) / len(others)
+    diff = abs(item["price"] - average)
+
+    if item["price"] < average:
+        return f"${diff:.2f} below the ${average:.2f} average for {item['category']}."
+    if item["price"] > average:
+        return f"${diff:.2f} above the ${average:.2f} average for {item['category']}."
+    return f"Right at the ${average:.2f} average for {item['category']}."

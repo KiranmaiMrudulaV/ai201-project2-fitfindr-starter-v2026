@@ -297,6 +297,76 @@ data). On the next run, if that file exists, it's loaded instead of
 starting from the example wardrobe, so `suggest_outfit` can reference items
 found in earlier runs.
 
+### Run showing the fourth tool
+
+The `Price:` line below is `compare_price`'s output, called automatically
+right after an item is selected:
+
+```
+$ python app.py ask 'vintage graphic tee under $30, size M'
+
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+  Price:    $4.00 below the $22.00 average for tops.
+  ...
+```
+
+### Run showing the second branch
+
+With the API key temporarily broken, `run_agent` stops cleanly instead of
+crashing with a stack trace:
+
+```
+>>> session = run_agent('vintage graphic tee under $30, size M', get_example_wardrobe())
+error: The model rejected your API key. Check GEMINI_API_KEY in your .env file, or create a fresh key at aistudio.google.com.
+fit_card: None
+```
+
+### Run showing style memory — two runs, the second shaped by the first
+
+Run 1 — wardrobe starts at 10 items, finds the Y2K Baby Tee, saves it:
+
+```
+$ python app.py ask 'vintage graphic tee under $30, size M'
+
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+  Price:    $4.00 below the $22.00 average for tops.
+  ...
+```
+
+After run 1, `data/saved_wardrobe.json` has 11 items (the original 10 plus
+the Y2K Baby Tee).
+
+Run 2 — a different query, loading the saved wardrobe from run 1:
+
+```
+$ python app.py ask 'denim jacket under $50'
+
+  Found:    Denim Jacket — Light Wash, Cropped — $42.0 on poshmark
+  Price:    $2.29 below the $44.29 average for outerwear.
+
+  Outfit:   Here are two outfit suggestions using the new light wash cropped denim jacket and pieces from their existing wardrobe:
+
+### Outfit 1: The Contrast Denim Look
+* **Top:** White ribbed tank top
+* **Bottoms:** Baggy straight-leg jeans (dark wash)
+* **Outerwear:** Denim Jacket — Light Wash, Cropped (the new item)
+* **Accessories & Shoes:** Brown leather belt, chunky white sneakers, and black crossbody bag
+
+### Outfit 2: Y2K Casual Cool
+* **Top:** Y2K Baby Tee (Butterfly Print)
+* **Bottoms:** Wide-leg khaki trousers
+* **Outerwear:** Denim Jacket — Light Wash, Cropped (the new item)
+* **Accessories & Shoes:** Black combat boots and black crossbody bag
+
+**Why it works:** The light wash denim and butterfly baby tee lean into a playful 2000s aesthetic...
+  ...
+```
+
+"Outfit 2" names the **Y2K Baby Tee (Butterfly Print)** — the item found in
+run 1, not part of the original example wardrobe. After run 2, the saved
+wardrobe file has 12 items (10 original + the tee from run 1 + the jacket
+from run 2).
+
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
      Don't fill these in during unit 3.

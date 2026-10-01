@@ -15,6 +15,9 @@ env/
 # Cached model responses
 .cache/
 
+# Style memory (stretch) — per-user state, not shared data
+data/saved_wardrobe.json
+
 # OS noise
 .DS_Store
 Thumbs.db
