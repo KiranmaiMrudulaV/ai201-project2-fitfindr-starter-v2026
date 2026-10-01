@@ -20,9 +20,48 @@ That last line is what your loop branches on. "Returns a list" earns nothing —
 the description has to say what is *in* the list.
 """
 
-import config  # noqa: F401 — you'll use this in search_listings
+import re
+
+import config
 from generate import generate
 from utils.data_loader import load_listings
+
+# Filler words that carry no search signal in a thrift query — without
+# dropping these, every listing scores at least 1 on "a" or "under" alone,
+# and the "drop anything scoring 0" step stops doing anything.
+STOP_WORDS = {
+    "a", "an", "the", "for", "with", "under", "over", "in", "of", "to",
+    "and", "or", "size", "looking", "like", "me", "my", "is", "are",
+}
+
+
+def _tokenize(text: str) -> set[str]:
+    """Lowercase, split on word boundaries, drop stop words."""
+    words = re.findall(r"\w+", text.lower())
+    return {w for w in words if w not in STOP_WORDS}
+
+
+# Matches a letter+digit run first ("W30"), then a plain letter run ("XL"),
+# then a plain number ("9", "8.5") — in that order, so a waist+length size
+# like "W30L30" splits into {"W30", "L30"} instead of one fused token, and a
+# plain shoe size like "US 9" still splits into {"US", "9"}.
+_SIZE_TOKEN_PATTERN = r"[A-Za-z]+\d+(?:\.\d+)?|[A-Za-z]+|\d+(?:\.\d+)?"
+
+
+def _size_tokens(size: str) -> set[str]:
+    return set(re.findall(_SIZE_TOKEN_PATTERN, size.upper()))
+
+
+def _size_matches(query_size: str, listing_size: str) -> bool:
+    """
+    Compare sizes by exact token, not substring.
+
+    A plain `"s" in "us 9"` is True, and so is `"l" in "xl"` — both wrong.
+    Splitting each side into tokens and checking for an exact overlap avoids
+    both false matches, and also makes "W30L30" (no space) match "W30 L30"
+    (with space) in the data, since both split into the same {"W30", "L30"}.
+    """
+    return bool(_size_tokens(query_size) & _size_tokens(listing_size))
 
 
 # ── Tool 1: search_listings ───────────────────────────────────────────────────
@@ -78,8 +117,32 @@ def search_listings(
     Test it from a terminal before you move on:
         python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
     """
-    # TODO: replace this with your implementation
-    return []
+    listings = load_listings()
+
+    candidates = []
+    for listing in listings:
+        if max_price is not None and listing["price"] > max_price:
+            continue
+        if size is not None and not _size_matches(size, listing["size"]):
+            continue
+        candidates.append(listing)
+
+    query_keywords = _tokenize(description)
+
+    scored = []
+    for listing in candidates:
+        text = " ".join([
+            listing["title"],
+            listing["description"],
+            " ".join(listing["style_tags"]),
+        ])
+        listing_keywords = _tokenize(text)
+        score = len(query_keywords & listing_keywords)
+        if score > 0:
+            scored.append((score, listing))
+
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return [listing for _, listing in scored[: config.SEARCH_RESULT_LIMIT]]
 
 
 # ── Tool 2: suggest_outfit ────────────────────────────────────────────────────
