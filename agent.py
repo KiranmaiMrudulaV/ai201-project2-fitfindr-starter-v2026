@@ -13,10 +13,40 @@ Build and test your three tools in `tools.py` first. Then come here.
     python agent.py          runs both example paths below
 """
 
+import re
+
 import config
 import trace
 from tools import search_listings, suggest_outfit, create_fit_card
 from generate import ModelUnavailable
+
+# How the query is parsed: regex. Catches "under $30" / "under 30" for a
+# price ceiling and "size M" / "size 8" / "size XXS" for a size. Known
+# limitation: only the "under $X" phrasing is recognized — "nothing over
+# $30" or "$30 max" won't parse to a price. Whatever is left after pulling
+# those two out becomes the description.
+_PRICE_PATTERN = re.compile(r"under\s*\$?\s*(\d+(?:\.\d+)?)", re.IGNORECASE)
+_SIZE_PATTERN = re.compile(r"\bsize\s+([A-Za-z0-9./]+)", re.IGNORECASE)
+
+
+def _parse_query(query: str) -> dict:
+    """Pull a description, a size, and a max_price out of free-typed text."""
+    max_price = None
+    price_match = _PRICE_PATTERN.search(query)
+    if price_match:
+        max_price = float(price_match.group(1))
+
+    size = None
+    size_match = _SIZE_PATTERN.search(query)
+    if size_match:
+        size = size_match.group(1)
+
+    description = _PRICE_PATTERN.sub("", query)
+    description = _SIZE_PATTERN.sub("", description)
+    description = re.sub(r"[,$]", " ", description)
+    description = re.sub(r"\s+", " ", description).strip()
+
+    return {"description": description, "size": size, "max_price": max_price}
 
 
 # ── session state ─────────────────────────────────────────────────────────────
@@ -107,8 +137,36 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     """
     session = new_session(query, wardrobe)
 
-    # TODO: delete these two lines and build the loop.
-    session["error"] = "The planning loop isn't built yet — see the TODO in agent.py."
+    count = 1
+    trace.check_iterations(count)
+
+    session["parsed"] = _parse_query(query)
+    parsed = session["parsed"]
+
+    session["search_results"] = search_listings(
+        parsed["description"], parsed["size"], parsed["max_price"]
+    )
+
+    # ── THE BRANCH ──
+    if not session["search_results"]:
+        session["error"] = (
+            f"No listings matched '{parsed['description']}'"
+            + (f", size {parsed['size']}" if parsed["size"] else "")
+            + (f", under ${parsed['max_price']:.0f}" if parsed["max_price"] else "")
+            + ". Try a wider price ceiling, a different size, or a looser description."
+        )
+        return session
+
+    session["selected_item"] = session["search_results"][0]
+
+    session["outfit_suggestion"] = suggest_outfit(
+        session["selected_item"], session["wardrobe"]
+    )
+
+    session["fit_card"] = create_fit_card(
+        session["outfit_suggestion"], session["selected_item"]
+    )
+
     return session
 
 

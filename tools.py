@@ -175,8 +175,31 @@ def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
     Test it from a terminal before you move on:
         python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
     """
-    # TODO: replace this with your implementation
-    return ""
+    item_desc = (
+        f"{new_item['title']} ({new_item['category']}, {new_item['size']}, "
+        f"colors: {', '.join(new_item['colors'])})"
+    )
+
+    items = wardrobe.get("items", [])
+    if not items:
+        prompt = (
+            f"Someone is considering thrifting this item: {item_desc}.\n"
+            "They don't have any wardrobe saved yet. Give general styling "
+            "advice for one or two outfits this item could work in."
+        )
+    else:
+        wardrobe_lines = "\n".join(
+            f"- {w['name']} ({w['category']}, colors: {', '.join(w['colors'])})"
+            for w in items
+        )
+        prompt = (
+            f"Someone is considering thrifting this item: {item_desc}.\n"
+            f"Here is their existing wardrobe:\n{wardrobe_lines}\n\n"
+            "Suggest one or two outfits that pair the new item with specific "
+            "pieces they already own. Name the pieces."
+        )
+
+    return generate(prompt)
 
 
 # ── Tool 3: create_fit_card ───────────────────────────────────────────────────
@@ -215,5 +238,15 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
     Test it from a terminal before you move on:
         python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
     """
-    # TODO: replace this with your implementation
-    return ""
+    if not outfit or not outfit.strip():
+        return "No outfit suggestion to caption yet."
+
+    brand = f"{new_item['brand']} " if new_item.get("brand") else ""
+    prompt = (
+        f"Write a short, casual social-media caption (2-4 sentences) for a "
+        f"thrift find: {brand}{new_item['title']}, ${new_item['price']:.0f} "
+        f"on {new_item['platform']}. Here's how I'd style it: {outfit}\n\n"
+        "Write it like a real post, not a product listing. Mention the price "
+        "and platform once, and be specific about the vibe."
+    )
+    return generate(prompt)
