@@ -39,9 +39,14 @@
 
 ## What This Does
 
-<!-- Three or four sentences: what a user asks for, and what they get back. -->
-
-
+You tell FitFindr what you're after in plain English — something like "a
+vintage graphic tee under $30, size M" — and it goes and finds the single
+best-matching listing for you. From there it figures out how that piece
+would actually work with clothes you already own (or gives general styling
+advice if you haven't saved a wardrobe yet), and wraps it all up in a short
+caption you could post without editing. If nothing in the listings matches
+what you asked for, it tells you that plainly instead of pretending to find
+something.
 
 ---
 
@@ -59,24 +64,39 @@
 
 ### `search_listings`
 
-- **What it does:**
-- **Inputs:** <!-- name and type each: `max_price` (float), not "a price" -->
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Searches the listings data for items matching a text
+  description, filtered by size and a price ceiling.
+- **Inputs:** `description` (str), `size` (str or None — None skips the size
+  filter), `max_price` (float or None — None skips the price filter).
+- **Returns:** A list of matching listing dicts, best match first. Each dict
+  has `id`, `title`, `description`, `category`, `style_tags` (list), `size`,
+  `condition`, `price` (float), `colors` (list), `brand` (str or None — most
+  listings have no brand), `platform`.
+- **When it has nothing:** Returns an empty list — never `None`, never an
+  exception.
 
 ### `suggest_outfit`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Given a thrifted item and the user's wardrobe, suggests
+  one or two outfit ideas.
+- **Inputs:** `new_item` (dict — a listing dict from `search_listings`),
+  `wardrobe` (dict with an `items` key, which may be empty).
+- **Returns:** A non-empty string with outfit suggestions, naming specific
+  pieces from the wardrobe when there are any.
+- **When it has nothing:** If the wardrobe's `items` list is empty, returns
+  general styling advice for the item instead of raising or returning an
+  empty string.
 
 ### `create_fit_card`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Writes a short caption (2-4 sentences) someone would
+  actually post about the thrifted find.
+- **Inputs:** `outfit` (str — the suggestion from `suggest_outfit`),
+  `new_item` (dict — the listing dict).
+- **Returns:** A postable caption that mentions the item's price and
+  platform once each.
+- **When it has nothing:** If `outfit` is empty or whitespace-only, returns
+  `"No outfit suggestion to caption yet."` instead of raising.
 
 ---
 
@@ -93,13 +113,31 @@
      The grader checks your code against what you claim here, so the file and
      function have to be real. -->
 
-**Branch rule:**
+**Branch rule:** If `search_listings` returns an empty list, put a message
+in `session["error"]` naming what to try differently (a wider price, a
+different size, a looser description) and stop — `suggest_outfit` is never
+called. Otherwise, take the first item from `search_results` as
+`selected_item`, pass it with the wardrobe to `suggest_outfit` to get an
+outfit suggestion, then pass that outfit and the item to `create_fit_card`
+to get the caption.
 
 **Where it lives:** `agent.py::run_agent`
 
-**How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
+**How the query is parsed:** Regex. `_parse_query()` searches the text for
+known patterns — "under $X" for a price ceiling, "size X" for a size —
+extracts those values, and treats whatever text is left after removing them
+as the description. Known limitation: only the "under $X" phrasing is
+recognized, so something like "nothing over $30" or "$30 max" won't parse
+to a price ceiling.
 
-**What moves through the session:** <!-- which fields, in what order -->
+**What moves through the session:** `query` and `wardrobe` are set
+immediately when the session starts. Then, in order: `parsed`
+(description/size/max_price pulled from the query) → `search_results`
+(what `search_listings` returned) → `selected_item` (the first result,
+chosen from `search_results`) → `outfit_suggestion` (what `suggest_outfit`
+returned) → `fit_card` (what `create_fit_card` returned). `error` stays
+`None` unless the branch stops the run early — if it's set,
+`selected_item`, `outfit_suggestion`, and `fit_card` are still `None`.
 
 ---
 
@@ -113,8 +151,33 @@
 **One full query**
 
 ```
-$ python app.py ask '...'
+$ python app.py ask 'vintage graphic tee under $30, size M'
 
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+  Outfit:   Here are two outfit suggestions that seamlessly integrate the Y2K butterfly baby tee into their existing wardrobe:
+
+### Outfit 1: High-Contrast Y2K Streetwear (Balanced Proportions)
+This outfit plays on the classic Y2K silhouette of a tight top paired with loose, baggy bottoms, using contrast to make the pink, purple, and white butterfly print pop against the dark wash.
+
+*   **Top:** Y2K Butterfly Baby Tee
+*   **Bottoms:** Baggy straight-leg jeans (dark wash)
+*   **Outerwear:** Vintage black denim jacket (worn off the shoulders or open)
+*   **Shoes:** Chunky white sneakers
+*   **Accessories:** Black crossbody bag
+
+### Outfit 2: Retro Casual Prep (Soft & Sporty)
+This look leans into a softer, retro-casual palette by pairing the pastel tones of the baby tee with warm neutrals, tied together with classic footwear.
+
+*   **Top:** Y2K Butterfly Baby Tee
+*   **Bottoms:** Wide-leg khaki trousers
+*   **Accessories:** Brown leather belt (to define the waist with the tucked-in tee)
+*   **Outerwear:** Black cropped zip hoodie (carried or layered over the shoulders)
+*   **Shoes:** Chunky white sneakers
+
+  Fit card: Found my ultimate Y2K butterfly baby tee on Depop for just $18 and I'm officially obsessed 🦋✨ Thinking of styling it either wayyy baggy with dark denim for that classic streetwear contrast, or tucked into wide-leg khakis for a sporty-prep moment. Which vibe are we leaning towards today? 👇
+
+0 model calls this session, 2 served from cache
 ```
 
 **The three tools, tested one at a time**
@@ -122,16 +185,41 @@ $ python app.py ask '...'
 ```
 $ python -c "from tools import search_listings; print(search_listings('graphic tee', max_price=30))"
 
+[{'id': 'lst_002', 'title': 'Y2K Baby Tee — Butterfly Print', 'description': 'Super cute early 2000s baby tee with butterfly graphic. Fitted crop length. Tag says medium but fits like a small.', 'category': 'tops', 'style_tags': ['y2k', 'vintage', 'graphic tee', 'cottagecore'], 'size': 'S/M', 'condition': 'excellent', 'price': 18.0, 'colors': ['white', 'pink', 'purple'], 'brand': None, 'platform': 'depop'}, {'id': 'lst_006', 'title': 'Graphic Tee — 2003 Tour Bootleg Style', 'description': 'Vintage-style bootleg tee with faded graphic. Slightly boxy fit. 100% cotton, soft and worn-in.', 'category': 'tops', 'style_tags': ['graphic tee', 'vintage', 'grunge', 'streetwear', 'band tee'], 'size': 'L', 'condition': 'good', 'price': 24.0, 'colors': ['black'], 'brand': None, 'platform': 'depop'}, {'id': 'lst_017', 'title': 'Mesh Long-Sleeve Top — Black', 'description': 'Sheer black mesh long-sleeve. Great for layering under a graphic tee or over a bralette. Stretchy material, fits true to size.', 'category': 'tops', 'style_tags': ['y2k', 'grunge', 'goth', 'layering'], 'size': 'S/M', 'condition': 'excellent', 'price': 15.0, 'colors': ['black'], 'brand': None, 'platform': 'depop'}, {'id': 'lst_033', 'title': 'Vintage Band Tee — Faded Grey', 'description': 'Faded grey band-style tee with distressed graphic. Crew neck. Fits boxy. Well-loved but no holes or major damage.', 'category': 'tops', 'style_tags': ['vintage', 'grunge', 'band tee', 'graphic tee', 'streetwear'], 'size': 'L', 'condition': 'fair', 'price': 19.0, 'colors': ['grey', 'charcoal'], 'brand': None, 'platform': 'depop'}, {'id': 'lst_011', 'title': 'Low-Rise Cargo Pants — Khaki', 'description': 'Y2K era low-rise cargo pants. Lots of pockets. Khaki color, slightly distressed at the hems. Great for layering with a long tee.', 'category': 'bottoms', 'style_tags': ['y2k', 'cargo', '2000s', 'streetwear'], 'size': 'W29', 'condition': 'fair', 'price': 27.0, 'colors': ['khaki', 'tan'], 'brand': None, 'platform': 'poshmark'}, {'id': 'lst_015', 'title': 'Vintage Graphic Hoodie — Faded Black', 'description': 'Faded black pullover hoodie with barely-visible vintage graphic on the chest. Cozy interior. Some pilling but adds to the worn-in look.', 'category': 'tops', 'style_tags': ['vintage', 'grunge', 'graphic', 'streetwear'], 'size': 'L', 'condition': 'fair', 'price': 26.0, 'colors': ['black', 'charcoal'], 'brand': None, 'platform': 'depop'}]
 ```
 
 ```
-$ python -c "from tools import suggest_outfit; ..."
+$ python -c "from tools import suggest_outfit; from utils.data_loader import get_example_wardrobe, load_listings; print(suggest_outfit(load_listings()[0], get_example_wardrobe()))"
 
+Here are two outfit ideas that seamlessly integrate the vintage Levi's 501 medium wash jeans into your existing wardrobe, creating distinct looks using only pieces you already own:
+
+### Outfit 1: Casual & Sporty (Everyday Uniform)
+This look leans into a classic, effortless off-duty aesthetic, balancing the structured medium-wash denim with cozy, relaxed layers.
+
+*   **Bottoms:** Vintage Levi's 501 Jeans (Medium Wash)
+*   **Top:** White ribbed tank top
+*   **Outerwear:** Oversized grey crewneck sweatshirt (worn over the shoulders or layered on top)
+*   **Shoes:** Chunky white sneakers
+*   **Accessories:** Black crossbody bag
+
+**Why it works:** The white ribbed tank tucked into the medium-wash 501s creates a clean, timeless silhouette. Throwing on the oversized grey crewneck adds texture and comfort, while the chunky white sneakers and black crossbody tie the casual, street-style elements together.
+
+### Outfit 2: Edgy & Textured (Cool-Weather Contrast)
+This look plays with contrasting textures and colors, pairing the vintage blue denim with darker, bolder pieces for an effortlessly cool vibe.
+
+*   **Bottoms:** Vintage Levi's 501 Jeans (Medium Wash)
+*   **Top:** Black cropped zip hoodie
+*   **Outerwear:** Vintage black denim jacket (layered over the hoodie)
+*   **Shoes:** Black combat boots
+*   **Accessories:** Brown leather belt
+
+**Why it works:** Layering the black cropped zip hoodie under the vintage black denim jacket creates a great "double-black" contrast against the brighter, medium-wash blue of the jeans. The black combat boots ground the outfit with a rugged edge, and the brown leather belt adds a subtle, earthy accent that breaks up the black-and-blue color palette.
 ```
 
 ```
-$ python -c "from tools import create_fit_card; ..."
+$ python -c "from tools import create_fit_card; from utils.data_loader import load_listings; print(create_fit_card('jeans and white sneakers', load_listings()[0]))"
 
+Scored these vintage Levi's 501s on Depop for just $38 and I am officially obsessed. The medium wash has that *exact* broken-in, effortless 90s vibe I've been hunting for. Honestly, nothing beats throwing them on with crisp white sneakers and calling it a day. ✨
 ```
 
 ---
@@ -147,15 +235,40 @@ $ python -c "from tools import create_fit_card; ..."
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* Help writing `search_listings`' size-matching logic
+  so it wouldn't have the substring bug the stub warns about (`"s" in
+  "us 9"` being `True`).
+- *What came back:* A token-based matcher that split both the requested
+  size and the listing's size on plain alphanumeric runs. It fixed the
+  original substring bug, but lecture that same night used an example
+  (`W32L30`, no space) that exposed a second bug: a fused waist+length size
+  like `"W30L30"` tokenized differently than the data's spaced version
+  `"W30 L30"`, so they'd never match even though they mean the same size.
+- *What I changed:* We tested the fused-size case directly
+  (`_size_matches('W30L30', 'W30 L30')` came back `False`), then rewrote
+  the regex to match letter+digit runs first (`[A-Za-z]+\d+`) before
+  falling back to plain letters or plain digits, so `"W30L30"` and
+  `"W30 L30"` both tokenize to `{"W30", "L30"}`. I re-ran all the earlier
+  size tests (`S` vs `US 9`, `L` vs `XL`) to confirm the fix didn't break
+  anything that was already working.
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* Feedback on my draft for acceptance criterion 4 (the
+  fit card one): *"4 of 5 should give different captions, mentioning
+  price platform completely different sentences of same garment."*
+- *What came back:* A specific objection, not a rewrite — the sentence
+  couldn't be tested as written because "all of them should be different"
+  and "in at least 4 of 5 tries" contradict each other (one says every
+  caption must be unique, the other implies some can fail). I was asked to
+  pick one of two concrete interpretations before going further.
+- *What I changed:* I picked the interpretation where price/platform
+  mentions are judged per-try at 4 of 5, and uniqueness across all 5 is
+  judged separately with zero tolerance. I rewrote the criterion as two
+  explicit checks instead of one vague "different captions" claim, and
+  tied the "why" to something concrete — `TEMPERATURE = 0.9` in
+  `config.py` — instead of the vague "it's user experience" reasoning I
+  started with.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
