@@ -270,6 +270,33 @@ Scored these vintage Levi's 501s on Depop for just $38 and I am officially obses
   `config.py` — instead of the vague "it's user experience" reasoning I
   started with.
 
+---
+
+## Stretch Features
+
+<!-- Declared before being built, per the rubric's all-or-nothing rule. -->
+
+**A fourth tool — `compare_price(item)`:** Compares a listing's price to
+the average price of other listings in the same category (e.g. "$4 below
+the $22 average for tops"). Called right after an item is selected; the
+result is stored in `session["price_comparison"]`. If the item is the only
+listing in its category, returns a message saying there's nothing to
+compare against instead of dividing by zero.
+
+**A second branch — model failure stops the run cleanly:** If
+`suggest_outfit` or `create_fit_card` raises `ModelUnavailable` (bad key,
+no network), `run_agent` catches it, puts a message in `session["error"]`,
+and returns early — the same pattern as the empty-search branch, but
+triggered by a completely different condition (the model being unreachable,
+not the search coming up empty).
+
+**Style memory — the wardrobe persists between runs:** After a successful
+run, the newly thrifted item is added to the wardrobe and saved to
+`data/saved_wardrobe.json` (gitignored — it's per-user state, not shared
+data). On the next run, if that file exists, it's loaded instead of
+starting from the example wardrobe, so `suggest_outfit` can reference items
+found in earlier runs.
+
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
      Don't fill these in during unit 3.
