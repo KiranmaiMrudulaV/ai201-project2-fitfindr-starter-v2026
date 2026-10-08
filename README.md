@@ -449,21 +449,75 @@ that produced it:
 **Happy path**
 
 ```
+$ python app.py ask 'vintage graphic tee under $30, size M' --trace
 
+[1] _parse_query
+      in:  vintage graphic tee under $30, size M
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 8 items: Y2K Baby Tee — Butterfly Print, Mesh Long-Sleeve Top — Black, 90s Silk Slip Dress — Floral, Midi Length … +5 more
+[3] compare_price
+      in:  Y2K Baby Tee — Butterfly Print ($18.0, depop)
+      out: $4.00 below the $22.00 average for tops.
+[4] suggest_outfit
+      in:  Y2K Baby Tee — Butterfly Print ($18.0, depop)
+      out: Here are two outfit ideas that pair the Y2K Butterfly Baby Tee with your light wash, cropped denim jacket: …
+[5] create_fit_card
+      in:  Here are two outfit ideas that pair the Y2K Butterfly Baby Tee with your light wash, cropped denim jacket: …
+      out: Found this absolute gem on depop for just $18 and I am never taking it off. 🦋✨ Giving major Y2K street style w…
 ```
 
 **Empty search**
 
 ```
+$ python app.py ask 'designer ballgown size XXS under $5' --trace
 
+[1] _parse_query
+      in:  designer ballgown size XXS under $5
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: [] (empty)
+[3] branch
+      →    empty results — stopping before suggest_outfit
 ```
 
-**On the MCP move:** <!-- what changed in your code, and whether anything
-behaved differently afterwards. If the rewire didn't work, say exactly where it
-broke — the error text and the last thing that worked. That earns the point in
-full. -->
+The happy path takes 5 steps; the empty-search path stops at 3 and never
+reaches `suggest_outfit` or `create_fit_card` — the branch is visibly doing
+something, not just present in the code.
 
+**On the MCP move:** Moved `search_listings` onto MCP (`mcp_server.py`),
+with the tool description naming the size-matching behavior (token-based,
+not substring), stating `max_price` as a USD ceiling, and stating the
+empty-list case explicitly — since that description is now a contract read
+by something that can't see my code. `run_agent` calls it through
+`mcp_client.call_tool("search_listings", {...})` instead of a direct
+import. Nothing behaved differently afterward: the same matching query
+found the same item, and the empty-search branch still stopped with 0
+model calls, exactly as before the move. `suggest_outfit` and
+`create_fit_card` are untouched.
 
+**Failure modes triggered on purpose:**
+
+1. **Empty search** — `python app.py ask 'designer ballgown size XXS under $5'`
+   → `No listings matched 'designer ballgown', size XXS, under $5. Try a
+   wider price ceiling, a different size, or a looser description.` Stops
+   before `suggest_outfit`, 0 model calls. No new handler needed — this is
+   `search_listings` returning `[]` plus the existing branch.
+2. **Empty wardrobe** — `python app.py ask 'denim jacket under $50'
+   --empty-wardrobe` → `suggest_outfit` returned two full general-styling
+   outfit suggestions (not a crash, not an empty string) despite having no
+   saved items to reference. No new handler needed — this was already
+   `suggest_outfit`'s designed behavior from unit 3.
+3. **Model unavailable** — corrupted one character of `GEMINI_API_KEY` in
+   `.env`, then ran a query never asked before (`'leather belt brown
+   braided under $15'`, to rule out a cached answer) → `The model rejected
+   your API key. Check GEMINI_API_KEY in your .env file, or create a fresh
+   key at aistudio.google.com.` No raw stack trace, no hang. No new handler
+   needed — `run_agent`'s `except ModelUnavailable` catch (built as unit
+   3's stretch second branch) already covers this. Key was restored
+   immediately after, confirmed by `python test.py` passing 10/10 again.
 
 ---
 
