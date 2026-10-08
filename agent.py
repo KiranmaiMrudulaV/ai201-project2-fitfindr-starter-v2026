@@ -174,12 +174,17 @@ def run_agent(query: str, wardrobe: dict) -> dict:
 
     session["parsed"] = _parse_query(query)
     parsed = session["parsed"]
+    trace.step("_parse_query", inputs=query, returned=parsed)
 
-    session["search_results"] = call_tool("search_listings", {
+    search_args = {
         "description": parsed["description"],
         "size": parsed["size"],
         "max_price": parsed["max_price"],
-    })
+    }
+    session["search_results"] = call_tool("search_listings", search_args)
+    trace.step(
+        "search_listings (via MCP)", inputs=search_args, returned=session["search_results"]
+    )
 
     # ── THE BRANCH ──
     if not session["search_results"]:
@@ -189,10 +194,15 @@ def run_agent(query: str, wardrobe: dict) -> dict:
             + (f", under ${parsed['max_price']:.0f}" if parsed["max_price"] else "")
             + ". Try a wider price ceiling, a different size, or a looser description."
         )
+        trace.step("branch", note="empty results — stopping before suggest_outfit")
         return session
 
     session["selected_item"] = session["search_results"][0]
+
     session["price_comparison"] = compare_price(session["selected_item"])
+    trace.step(
+        "compare_price", inputs=session["selected_item"], returned=session["price_comparison"]
+    )
 
     # ── SECOND BRANCH (stretch): the model being unreachable is a different
     # condition than an empty search, and needs its own stop. ──
@@ -200,11 +210,23 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         session["outfit_suggestion"] = suggest_outfit(
             session["selected_item"], session["wardrobe"]
         )
+        trace.step(
+            "suggest_outfit",
+            inputs=session["selected_item"],
+            returned=session["outfit_suggestion"],
+        )
+
         session["fit_card"] = create_fit_card(
             session["outfit_suggestion"], session["selected_item"]
         )
+        trace.step(
+            "create_fit_card",
+            inputs=session["outfit_suggestion"],
+            returned=session["fit_card"],
+        )
     except ModelUnavailable as exc:
         session["error"] = str(exc)
+        trace.step("branch", note=f"model unavailable — stopping: {exc}")
         return session
 
     _remember_wardrobe_item(session["wardrobe"], session["selected_item"])
