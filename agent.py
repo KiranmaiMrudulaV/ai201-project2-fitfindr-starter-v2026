@@ -18,8 +18,9 @@ import re
 
 import config
 import trace
-from tools import search_listings, suggest_outfit, create_fit_card, compare_price
+from tools import suggest_outfit, create_fit_card, compare_price
 from generate import ModelUnavailable
+from mcp_client import call_tool
 
 # Style memory (stretch): where the wardrobe gets saved between runs.
 # Per-user state, not shared data, so it's gitignored.
@@ -174,9 +175,11 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     session["parsed"] = _parse_query(query)
     parsed = session["parsed"]
 
-    session["search_results"] = search_listings(
-        parsed["description"], parsed["size"], parsed["max_price"]
-    )
+    session["search_results"] = call_tool("search_listings", {
+        "description": parsed["description"],
+        "size": parsed["size"],
+        "max_price": parsed["max_price"],
+    })
 
     # ── THE BRANCH ──
     if not session["search_results"]:
