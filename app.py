@@ -118,6 +118,8 @@ def _ask_one(query, wardrobe, use_trace):
         print(f"  {session['error']}")
     else:
         item = session["selected_item"] or {}
+        if session.get("dropped_constraint"):
+            print(f"  (no exact match — dropped {session['dropped_constraint']} and retried)")
         print(f"  Found:    {item.get('title')} — ${item.get('price')} on {item.get('platform')}")
         print(f"  Price:    {session['price_comparison']}")
         print()

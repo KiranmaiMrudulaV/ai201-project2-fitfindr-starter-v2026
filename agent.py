@@ -18,7 +18,7 @@ import re
 
 import config
 import trace
-from tools import suggest_outfit, create_fit_card, compare_price
+from tools import suggest_outfit, create_fit_card
 from generate import ModelUnavailable
 from mcp_client import call_tool
 
@@ -105,6 +105,7 @@ def new_session(query: str, wardrobe: dict) -> dict:
         "outfit_suggestion": None,   # what suggest_outfit returned
         "price_comparison": None,    # what compare_price returned (stretch)
         "fit_card": None,            # what create_fit_card returned
+        "dropped_constraint": None,  # set when the size-retry (stretch) found a match
         "error": None,               # set when the run ended early
     }
 
@@ -186,6 +187,23 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         "search_listings (via MCP)", inputs=search_args, returned=session["search_results"]
     )
 
+    # ── RETRY WITH LOOSER CONSTRAINTS (stretch) ──
+    # An empty result with a size specified might just mean the size was too
+    # narrow, not that the item doesn't exist. Retry once without it before
+    # giving up — and say what got dropped if it works.
+    if not session["search_results"] and parsed["size"]:
+        retry_args = {**search_args, "size": None}
+        retry_results = call_tool("search_listings", retry_args)
+        trace.step(
+            "search_listings (via MCP, retry without size)",
+            inputs=retry_args,
+            returned=retry_results,
+            note=f"dropped size filter ({parsed['size']!r}) after empty search",
+        )
+        if retry_results:
+            session["search_results"] = retry_results
+            session["dropped_constraint"] = f"size {parsed['size']}"
+
     # ── THE BRANCH ──
     if not session["search_results"]:
         session["error"] = (
@@ -199,9 +217,13 @@ def run_agent(query: str, wardrobe: dict) -> dict:
 
     session["selected_item"] = session["search_results"][0]
 
-    session["price_comparison"] = compare_price(session["selected_item"])
+    session["price_comparison"] = call_tool(
+        "compare_price", {"item": session["selected_item"]}
+    )
     trace.step(
-        "compare_price", inputs=session["selected_item"], returned=session["price_comparison"]
+        "compare_price (via MCP)",
+        inputs=session["selected_item"],
+        returned=session["price_comparison"],
     )
 
     # ── SECOND BRANCH (stretch): the model being unreachable is a different
