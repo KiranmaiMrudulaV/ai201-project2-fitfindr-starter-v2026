@@ -387,18 +387,40 @@ from run 2).
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. matching query completes all three tools | 4 of 5 | FAIL | PASS | FAIL | PASS | PASS | MISSED (3/5) |
+| 2. impossible query stops before suggest_outfit | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. selected item matches what suggest_outfit receives | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. fit card mentions price+platform (4/5), zero duplicate captions | 4/5 + 0 dup | PASS | PASS | PASS | PASS | PASS | MET (5/5, 0 duplicates) |
+| 5. size L search excludes XL listings | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
-**Real output from one try**, pasted as text, naming the file and function
-that produced it:
+Full output for all 25 tries: `results/run_2026-10-07_1936_before.md`,
+produced by `run_eval.py::main` calling `agent.py::run_agent`.
+
+**Real output from one try** — criterion 1, Try 1, a real miss (not staged):
 
 ```
+$ python run_eval.py --label before
+(scenario: matching query completes, query: "vintage graphic tee under $30")
 
+[1] _parse_query
+      in:  vintage graphic tee under $30
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: 10 items: Y2K Baby Tee — Butterfly Print, Graphic Tee — 2003 Tour Bootleg Style, Vintage Band Tee — Faded Grey … +7 more
+[3] compare_price
+      in:  Y2K Baby Tee — Butterfly Print ($18.0, depop)
+      out: $4.00 below the $22.00 average for tops.
+[4] suggest_outfit
+      in:  Y2K Baby Tee — Butterfly Print ($18.0, depop)
+      out: Here are two outfit suggestions that pair the Y2K butterfly baby tee with pieces from the existing wardrobe: …
+[5] branch
+      →    model unavailable — stopping: Couldn't reach the model: 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}
+
+try 1: stopped early — Couldn't reach the model: 503 UNAVAILABLE...
 ```
+
+Produced by `run_eval.py::run_once` calling `agent.py::run_agent`.
 
 ---
 
@@ -422,15 +444,34 @@ that produced it:
 
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
-| 1 |  |  |  |  |
-| 2 |  |  |  |  |
-| 3 |  |  |  |  |
-| 4 |  |  |  |  |
-| 5 |  |  |  |  |
+| 1 | Matching query completes all three tools | 4 of 5 | **MISSED (3/5)** | Counted the 5 tries in the run log: 2 stopped early before reaching `create_fit_card`, both with `ModelUnavailable` stopping the run. 3 completed. 3 is below the 4-of-5 target, so this is a miss, not a borderline pass. |
+| 2 | Impossible query stops before suggest_outfit | 5 of 5 | **MET (5/5)** | All 5 tries show `stopped early: yes` with a message naming what to change, `selected_item: (none)`, and 0 model calls in the trace. |
+| 3 | Selected item matches what suggest_outfit receives | 5 of 5 | **MET (5/5)** | For all 5 tries, `session["selected_item"]`'s title/price/platform exactly match the `in:` value on the `[4] suggest_outfit` trace line. No mismatch in any try. |
+| 4 | Fit card mentions price+platform (4/5), zero duplicate captions | 4/5 + 0 dup | **MET (5/5, 0 duplicates)** | All 5 captions mention both `$18` and `Depop` — stronger than the 4/5 required. Comparing all 5 texts pairwise, none are word-for-word identical (tries 1 and 4 open with a near-identical sentence before diverging, which isn't a duplicate by my own criterion's wording, but is a pattern worth watching). |
+| 5 | Size L search excludes XL listings | 5 of 5 | **MET (5/5)** | All 5 tries returned the identical 6-item list (expected — no model call, no randomness). None of the 3 XL-only listings that also match "vintage"/"streetwear" keywords appear in any try. |
 
 **Diagnoses**
 
+**Criterion 1 — the only miss.** Place: the model's output, by way of the
+`ModelUnavailable` branch — not `search_listings`, not the session, not the
+branch logic itself. Mechanism: both failing tries hit a real
+`503 UNAVAILABLE` ("This model is currently experiencing high demand")
+error from the Gemini API, on the *second* model call of the run (after
+`suggest_outfit` had already succeeded once, in try 1's case) or on the
+first call (try 3). My `except ModelUnavailable` branch caught both
+correctly and stopped the run with a clean message instead of crashing —
+the agent did exactly what it was built to do. The tool worked; the model's
+own availability didn't.
 
+This is a different mechanism than the one I reasoned about when I set the
+4-of-5 target. My original "why" for this criterion was about
+`search_listings`' exact-token-overlap matching occasionally missing a
+valid phrasing — a problem in my own code. What actually caused both
+misses this run was the external API being temporarily overloaded, which
+has nothing to do with my search logic. Both misses share the identical
+mechanism (a `503` from the same call), so this is one problem occurring
+twice, not two separate ones — and it's a problem with the dependency, not
+with anything I built.
 
 ---
 
