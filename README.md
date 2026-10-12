@@ -636,16 +636,28 @@ improvement. Two things worth naming honestly rather than papering over:
   this pattern. I didn't chase it because it's outside what my current
   criterion actually measures, not because I think it's a non-issue.
 
-
 ---
 
-## What's Still Broken
+## Stretch Features — Unit 4
 
-<!-- For each criterion still missed: what you'd do, and why you stopped where
-     you did. "I ran out of time" is fine if it's true. Pretending nothing is
-     left is not. -->
+<!-- Declared before being built, per the rubric's all-or-nothing rule. -->
 
+**A second tool moved onto MCP:** `compare_price` gets registered on
+`mcp_server.py` alongside `search_listings`. `run_agent` calls it through
+`mcp_client.call_tool` instead of a direct import.
 
+**Retry with looser constraints:** When `search_listings` (via MCP) comes
+back empty and a size was specified, `run_agent` retries once without the
+size filter. If that retry finds something, the run continues with those
+results and the message says the size filter was dropped. If it's still
+empty, the existing empty-search message and branch apply unchanged.
+
+**A second measured improvement:** The diagnosis in "What's Still Broken"
+names a real pattern — two fit cards in the "before" run opened with
+nearly identical sentences. The change: tighten `create_fit_card`'s prompt
+to explicitly ask for a distinct opening line, instead of letting the
+model default to a favorite phrasing. Re-run the full eval afterward and
+report honestly whether the pattern actually goes away.
 
 <!-- ═════════════════════════════════════════════════════════════════════
 
