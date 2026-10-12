@@ -328,11 +328,23 @@ def generate(
                 or "resource" in message and "exhaust" in message
                 or "rate" in message and "limit" in message
             )
-            if not rate_limited:
+            # Unit 4 improvement: a 503 "high demand" error is the service
+            # being temporarily overloaded, not a bad key or a dead model
+            # name. Unlike those, it's worth retrying the same way a rate
+            # limit is — raising ModelUnavailable on the first occurrence
+            # (the old behavior) killed otherwise-healthy runs that would
+            # have succeeded a few seconds later.
+            transiently_unavailable = (
+                "503" in message
+                or "unavailable" in message
+                or ("high" in message and "demand" in message)
+            )
+            if not (rate_limited or transiently_unavailable):
                 raise ModelUnavailable(_explain(exc)) from exc
             backoff = _retry_delay(exc, attempt)
+            reason = "rate limit" if rate_limited else "service unavailable"
             print(
-                f"  [rate limit] service pushed back. Waiting {backoff:.0f}s "
+                f"  [{reason}] service pushed back. Waiting {backoff:.0f}s "
                 f"(attempt {attempt + 1} of {config.MAX_RETRIES}). This is "
                 f"the limiter doing its job, not a bug.",
                 file=sys.stderr,
@@ -341,6 +353,6 @@ def generate(
             time.sleep(backoff)
 
     raise RuntimeError(
-        f"Still rate limited after {config.MAX_RETRIES} attempts. Wait a "
-        f"minute and try again — your key is fine.\nLast error: {last_error}"
+        f"Still rate limited or unavailable after {config.MAX_RETRIES} attempts. "
+        f"Wait a minute and try again — your key is fine.\nLast error: {last_error}"
     )

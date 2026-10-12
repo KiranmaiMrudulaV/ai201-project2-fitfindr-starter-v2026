@@ -569,25 +569,72 @@ model calls, exactly as before the move. `suggest_outfit` and
 
      `python run_eval.py --label after` -->
 
-**What I changed:**
+**What I changed:** In `generate.py`'s `generate()`, broadened the retry
+condition from rate-limit errors only (`429`, "resource exhausted", "rate
+limit") to also include `503`/"unavailable"/"high demand" errors. Before
+this change, a `503` went straight to `ModelUnavailable` and killed the
+run on the first occurrence; now it retries with the same backoff logic
+already used for rate limits.
 
-**Which failure it was meant to fix:**
+**Which failure it was meant to fix:** Criterion 1's diagnosed miss —
+both failing tries in the "before" run hit a real `503 UNAVAILABLE` from
+the Gemini API, which the old code treated as a permanent failure (same
+bucket as a bad API key) instead of a transient one worth retrying.
 
 ### Run Log — After
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. impossible query stops before suggest_outfit | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. selected item matches what suggest_outfit receives | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. fit card mentions price+platform (4/5), zero duplicate captions | 4/5 + 0 dup | PASS | PASS | PASS | PASS | PASS | MET (5/5, 0 duplicates) |
+| 5. size L search excludes XL listings | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
-**Did it help, and how do I know:**
+Full output: `results/run_2026-10-12_0029_after.md`, produced by
+`run_eval.py::main` calling `agent.py::run_agent`.
 
-<!-- If it made things worse, say that. Honestly reported, that earns full
-     credit and is more interesting than one that worked. -->
+**Did it help, and how do I know:** Yes. Criterion 1 went from 3/5 to
+5/5 — the only criterion that was missing its target before is now
+meeting it, and nothing else regressed (criteria 2-5 are identical,
+5/5, to the before run). This isn't just the API behaving better this
+time by luck: the "after" run's raw output shows the new retry path
+firing for real —
 
+```
+[service unavailable] service pushed back. Waiting 1s (attempt 1 of 5). This is the limiter doing its job, not a bug.
+```
+
+— four separate times during the run. Each time, the old code would have
+raised `ModelUnavailable` immediately and ended that scenario's run early;
+the new code waited 1 second, retried, and succeeded. The fix is doing
+exactly what the diagnosis said it should.
+
+---
+
+## What's Still Broken
+
+<!-- For each criterion still missed: what you'd do, and why you stopped where
+     you did. "I ran out of time" is fine if it's true. Pretending nothing is
+     left is not. -->
+
+Nothing is currently missed — all five criteria are MET (5/5) after the
+improvement. Two things worth naming honestly rather than papering over:
+
+- **The fix doesn't eliminate `503`s, it just rides through them.** If the
+  Gemini API went down for longer than `MAX_RETRIES` (5 attempts) worth of
+  backoff, the run would still fail with a `RuntimeError`. I haven't
+  tested that longer-outage case — doing so would mean simulating an
+  extended outage, which isn't something I can trigger on the real
+  service on demand.
+- **Criterion 4's near-duplicate pattern** (tries 1 and 4 in the "before"
+  run opened with nearly the same sentence) didn't reappear verbatim in
+  the "after" run, but I didn't dig into *why* the model favors certain
+  openings at `TEMPERATURE = 0.9`. It's not a miss against my criterion as
+  written, but if I tightened criterion 4 to check opening-sentence
+  similarity instead of exact duplication, I'd expect to find more of
+  this pattern. I didn't chase it because it's outside what my current
+  criterion actually measures, not because I think it's a non-issue.
 
 
 ---
