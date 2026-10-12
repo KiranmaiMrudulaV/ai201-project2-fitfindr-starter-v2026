@@ -241,13 +241,19 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
     if not outfit or not outfit.strip():
         return "No outfit suggestion to caption yet."
 
+    # Unit 4, second improvement: the "before" run showed two captions
+    # opening with nearly the same sentence ("Found the ultimate ... and I
+    # am *obsessed*"). The added line below asks the model to avoid its
+    # default opener instead of leaving that to chance.
     brand = f"{new_item['brand']} " if new_item.get("brand") else ""
     prompt = (
         f"Write a short, casual social-media caption (2-4 sentences) for a "
         f"thrift find: {brand}{new_item['title']}, ${new_item['price']:.0f} "
         f"on {new_item['platform']}. Here's how I'd style it: {outfit}\n\n"
         "Write it like a real post, not a product listing. Mention the price "
-        "and platform once, and be specific about the vibe."
+        "and platform once, and be specific about the vibe. Avoid a generic "
+        "opener like 'Found this ... and I'm obsessed' or 'Scored this ... "
+        "for just $X' — write a first sentence specific to this exact item."
     )
     return generate(prompt)
 

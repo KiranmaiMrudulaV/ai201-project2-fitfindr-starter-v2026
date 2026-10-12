@@ -659,6 +659,76 @@ to explicitly ask for a distinct opening line, instead of letting the
 model default to a favorite phrasing. Re-run the full eval afterward and
 report honestly whether the pattern actually goes away.
 
+### Run showing the second MCP tool and the retry
+
+```
+$ python app.py ask 'denim jacket size XXL'
+
+[1] _parse_query
+      in:  denim jacket size XXL
+      out: dict with keys: description, size, max_price
+[2] search_listings (via MCP)
+      in:  dict with keys: description, size, max_price
+      out: [] (empty)
+[3] search_listings (via MCP, retry without size)
+      in:  dict with keys: description, size, max_price
+      out: 8 items: Denim Jacket — Light Wash, Cropped, Vintage Levi's 501 Jeans — Medium Wash, 90s Track Jacket — Navy/White Stripe … +5 more
+      →    dropped size filter ('XXL') after empty search
+[4] compare_price (via MCP)
+      in:  Denim Jacket — Light Wash, Cropped ($42.0, poshmark)
+      out: $2.29 below the $44.29 average for outerwear.
+[5] suggest_outfit
+      ...
+[6] create_fit_card
+      ...
+
+  (no exact match — dropped size XXL and retried)
+  Found:    Denim Jacket — Light Wash, Cropped — $42.0 on poshmark
+```
+
+No size `XXL` exists in the data for a denim jacket, so the sized search
+correctly comes back empty; the retry drops the size filter, finds the
+jacket by description alone, and both the trace and the printed output
+name exactly what was dropped. Confirmed the retry doesn't paper over a
+truly impossible query: `'designer ballgown size XXS under $5'` still
+retries, is still empty, and still stops with the normal message and 0
+model calls — the same result as before this stretch was added.
+
+### Run Log — Second Improvement
+
+| Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
+|---|---|---|---|---|---|---|---|
+| 1. matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. impossible query stops before suggest_outfit | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. selected item matches what suggest_outfit receives | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. fit card mentions price+platform (4/5), zero duplicate captions | 4/5 + 0 dup | PASS | PASS | PASS | PASS | PASS | MET (5/5, 0 duplicates) |
+| 5. size L search excludes XL listings | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+
+Full output: `results/run_2026-10-12_0103_after2.md`.
+
+**Did it help, and how do I know:** Mostly yes, with an honest caveat. On
+the actual criterion-4 scenario (5 tries on the Y2K Baby Tee), the fix
+worked cleanly — all 5 opening sentences are now genuinely distinct
+("Pulled this pastel butterfly baby tee...", "Pastel butterflies and a
+tiny cropped fit...", "That rhinestone butterfly graphic...", "That
+butterfly print is straight out of 2003...", "Channeling my inner 2003
+pop star..."), with zero shared openers, compared to the "before" run
+where two captions opened almost identically.
+
+But I also ran three quick extra captions on a *different* item (the
+Levi's jeans) to double check, and two of those three opened with
+"Nothing beats a broken-in pair of 501s..." / "Nothing beats that
+perfectly broken-in vintage denim..." — a new near-duplicate pattern,
+just a different sentence than before. So the fix removed the specific
+opener I diagnosed ("Found this... and I'm obsessed"), but it didn't
+remove the model's general tendency to settle into a favorite phrasing
+at `TEMPERATURE = 0.9` — it just moved which phrasing that is. My actual
+criterion 4, as written, only checks for word-for-word duplicates (which
+still passes 5/5 both before and after), so this doesn't show up as a
+regression against what I measured — but it's a real limit of the fix
+worth naming honestly rather than claiming a cleaner win than I actually
+got.
+
 <!-- ═════════════════════════════════════════════════════════════════════
 
      SUBMISSION CHECKLIST — unit 3
