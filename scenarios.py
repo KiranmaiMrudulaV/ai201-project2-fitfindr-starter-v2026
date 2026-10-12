@@ -35,18 +35,35 @@ SCENARIOS = [
         "wardrobe": "empty",
         "criterion": None,
     },
-    # TODO: add what your criteria 3, 4 and 5 need.
-    #
-    # Set "criterion" to the number in criteria.md that the scenario tests.
-    # "criterion": None means a diagnostic run — useful to have, but it isn't
-    # one of your five, and run_eval.py marks it as such in the table.
-    #
-    # For a state criterion, any normal query works — what you're checking is
-    # what ends up in the session, not what the user typed.
-    #
-    # For a fit-card criterion, you probably want the SAME query listed more
-    # than once, or several different items, depending on what your criterion
-    # actually says.
+    {
+        # Criterion 3: state. Any matching query works — what's checked is
+        # whether session["selected_item"] is the same item suggest_outfit
+        # received, not what the user typed.
+        "name": "selected item matches what suggest_outfit receives",
+        "query": "denim jacket under $50",
+        "wardrobe": "example",
+        "criterion": 3,
+    },
+    {
+        # Criterion 4: the fit card. Same query every try, so the SAME item
+        # gets a new caption each of the 5 tries (cache is off during
+        # run_eval) — checking price/platform mentions and no duplicates.
+        "name": "fit card mentions price and platform, no duplicates",
+        "query": "vintage graphic tee under $30, size M",
+        "wardrobe": "example",
+        "criterion": 4,
+    },
+    {
+        # Criterion 5: size matching. "vintage streetwear" matches several
+        # L-sized AND several XL-sized listings by keyword — a real test of
+        # whether size="L" wrongly pulls in the XL ones (the substring bug
+        # the criterion names). Deterministic (no model call), so all 5
+        # tries should come back identical.
+        "name": "size L search excludes XL listings",
+        "query": "vintage streetwear size L",
+        "wardrobe": "example",
+        "criterion": 5,
+    },
 ]
 
 WARDROBES = ("example", "empty")
