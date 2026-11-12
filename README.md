@@ -766,3 +766,21 @@ got.
 ---
 
 📖 **How to run this project: [RUNNING.md](RUNNING.md)**
+
+
+---
+
+## Capstone
+
+**What This Extends**
+
+This extends **FitFindr** (the multi-tool thrifting agent from units 3 and 4: `search_listings` over MCP, `compare_price`, `suggest_outfit`, `create_fit_card`, wired together by the loop in `agent.py::run_agent`). What's new is an operational layer around that existing agent: a structured run log (`logs/runs.jsonl`) that records every run, including failed ones, a measured cost per run, and a run path that someone else can follow from `RUNNING.md` alone. The agent's tools and planning loop are unchanged.
+
+**The Shape**
+
+**Shape A — deploy and instrument, on Path B (local with logs).** Every run of the agent writes one JSON record with a timestamp, the query that came in, what came out, how long it took, token usage and a status. A run that ends early or crashes writes a record too. The system is started by one documented command and I include a committed log from real runs. I chose Path B because the agent only calls a hosted model API (nothing local) but hosting would add a signup and a card for no grading benefit.
+
+Out of scope, on purpose:
+- No new tools and no changes to the planning loop's branching. The agent's behavior stays as unit 4 left it.
+- No hosting (Path A), no web UI work, and no changes to `serve.py`.
+- No changes to the parsing or search logic, even though the regex parser has known limits (see What's Still Broken in the unit 4 sections above).
