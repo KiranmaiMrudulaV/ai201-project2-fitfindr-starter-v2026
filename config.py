@@ -93,3 +93,7 @@ CACHE_DIR = ROOT / ".cache"
 
 DATA_DIR = ROOT / "data"
 RESULTS_DIR = ROOT / "results"
+
+# Capstone: one JSON record per agent run, appended here by runlog.py.
+# Deliberately NOT gitignored — the committed log is the run record.
+LOG_FILE = ROOT / "logs" / "runs.jsonl"

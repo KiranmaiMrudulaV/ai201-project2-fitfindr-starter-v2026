@@ -15,8 +15,11 @@ Build and test your three tools in `tools.py` first. Then come here.
 
 import json
 import re
+import time
 
 import config
+import generate
+import runlog
 import trace
 from tools import suggest_outfit, create_fit_card
 from generate import ModelUnavailable
@@ -112,9 +115,11 @@ def new_session(query: str, wardrobe: dict) -> dict:
 
 # ── planning loop ─────────────────────────────────────────────────────────────
 
-def run_agent(query: str, wardrobe: dict) -> dict:
+def _run_loop(query: str, wardrobe: dict) -> dict:
     """
     Run the loop once and return the finished session.
+    (Capstone: renamed from run_agent. Callers use run_agent(), below, which
+    wraps this with logging. The loop itself is unchanged.)
 
     Args:
         query:    what the user asked for, in plain language
@@ -253,6 +258,68 @@ def run_agent(query: str, wardrobe: dict) -> dict:
 
     _remember_wardrobe_item(session["wardrobe"], session["selected_item"])
 
+    return session
+
+
+# ── capstone: the instrumented entry point ────────────────────────────────────
+
+def _status_of(session: dict) -> str:
+    """Name how a finished run ended, for the log's `status` field."""
+    if not session["error"]:
+        return "ok"
+    # The loop stops in two places with session["error"] set. If an item was
+    # already selected, the stop came after search, i.e. the model failed.
+    return "model_unavailable" if session["selected_item"] else "empty_search"
+
+
+def run_agent(query: str, wardrobe: dict) -> dict:
+    """
+    Run the loop once, write one record to logs/runs.jsonl, return the session.
+
+    Every run leaves a record, including runs that end early (status
+    "empty_search" or "model_unavailable") and runs that crash (status
+    "exception", after which the exception is re-raised unchanged so callers
+    behave exactly as before). A failure that left no record would look the
+    same as "nobody used it".
+    """
+    start = time.perf_counter()
+    calls_before = generate.call_count()
+    tokens_before = generate.token_counts()
+
+    def _usage() -> dict:
+        after = generate.token_counts()
+        return {
+            "model_calls": generate.call_count() - calls_before,
+            "prompt_tokens": after["prompt"] - tokens_before["prompt"],
+            "output_tokens": after["output"] - tokens_before["output"],
+        }
+
+    try:
+        session = _run_loop(query, wardrobe)
+    except Exception as exc:
+        runlog.log_run(
+            query=query,
+            status="exception",
+            output=None,
+            error=f"{type(exc).__name__}: {exc}",
+            duration_s=round(time.perf_counter() - start, 3),
+            cache_enabled=config.CACHE_ENABLED,
+            **_usage(),
+        )
+        raise
+
+    item = session["selected_item"] or {}
+    runlog.log_run(
+        query=query,
+        status=_status_of(session),
+        output=session["fit_card"] or session["error"],
+        error=session["error"],
+        selected_item_id=item.get("id"),
+        dropped_constraint=session["dropped_constraint"],
+        duration_s=round(time.perf_counter() - start, 3),
+        cache_enabled=config.CACHE_ENABLED,
+        **_usage(),
+    )
     return session
 
 
