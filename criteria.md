@@ -123,3 +123,92 @@ model's output, this one should hold 5 of 5 every time, not 4 of 5.
      A number you missed stays where it is, gets diagnosed, and gets a fix
      attempted. That's where the points are.
      ───────────────────────────────────────────────────────────────────────── -->
+
+
+---
+
+# Capstone criteria (unit 9)
+
+Five criteria for the capstone extension: the structured run log, the run
+path, and the cost measurement around the FitFindr agent. Written before any
+capstone trial was run. Each trial below means one full pass of the described
+batch with the response cache off (`AI201_CACHE=0`), and each criterion is
+scored over **3 trials**. "A run" means one call to `agent.run_agent`, started
+the way RUNNING.md says (`python app.py ask '...'`).
+
+Note on order: the 10 cost-measurement runs in the README were done before
+these were written, because the brief puts cost measurement (Milestone 3)
+before criteria (Milestone 4). Criterion 4 and criterion 3's number were set
+knowing those averages; criteria 1, 2 and 5 were not.
+
+## 1. Every run leaves exactly one complete record
+
+Run a batch of 10 mixed inputs: 4 queries that match a listing, 2 impossible
+queries (e.g. `designer ballgown size XXS under $5`), 2 runs with a deliberately
+wrong `GEMINI_API_KEY`, and 2 malformed queries (an empty string and a
+3,000-character string). After the batch, `logs/runs.jsonl` must have gained
+**exactly 10 new lines**, each parseable as JSON and each containing the fields
+`timestamp`, `query`, `status`, `output`, `duration_s`. **10 of 10 per trial.**
+
+**Why this target:** The log is the only record I'll have once this runs
+where I'm not watching, so a missing line is a failure I would never see.
+`run_agent` writes the record in one wrapper that also catches exceptions, so
+I expect the logging itself to be solid, which is why the target is all 10 and
+not 9. The malformed inputs are where I don't know what happens, and that is
+the point of including them; looser than 10 of 10 would let a silent gap pass.
+
+## 2. Bad input and a failing model never crash the run or look like success
+
+For each of these 5 inputs: an empty string, a whitespace-only string, a
+3,000-character string, a query with a wrong API key, and an impossible
+query. `run_agent` must **return without raising**, the CLI output must
+contain **no `Traceback`**, and the log record's `status` must **not be `ok`**
+for the wrong-key and impossible-query cases (they must be `model_unavailable`
+and `empty_search` respectively). **5 of 5 per trial.**
+
+**Why this target:** A run that fails with a stack trace is worse than a
+run that stops politely, and a failure logged as `ok` is worse again, because
+the log would then lie. The wrong-key and impossible-query paths already have
+handlers from unit 4, so I expect them to hold; the empty, whitespace-only and
+enormous strings never had a test, so they are the real risk. 5 of 5 because
+each of these is a plain yes or no on a deterministic code path (no model is
+involved in the three malformed cases), unlike model output, which can vary.
+
+## 3. A normal run is fast enough, measured from the log
+
+Run the query `vintage graphic tee under $30` 10 times in a row, cache off.
+Using `duration_s` from the 10 log records, **at least 9 of 10 finish in under
+10 seconds.** This counts every run, not only warm ones: there is no cold start
+to excuse a slow one, because nothing sleeps, and each run includes starting a
+fresh MCP server subprocess and two model calls.
+
+**Why this target:** My first measured runs averaged about 8.5 seconds, so
+10 seconds is under 2 seconds above the mean, not a comfortable margin. I chose 9 of 10
+and not 10 of 10 because model latency varies and one slow call or rate-limit
+pause should not fail the whole criterion; I chose 10 seconds and not 20 because
+a person waiting at a terminal feels anything past 10 seconds as stuck.
+
+## 4. One run stays cheap, measured in tokens from the log
+
+Across the same 10 runs as criterion 3, the **mean of `prompt_tokens +
+output_tokens` per `ok` run is at most 1,200, and no single run exceeds
+2,000.** Both numbers come from the log records, not from a pricing page.
+
+**Why this target:** The measured mean was about 943 tokens, so 1,200 leaves
+roughly a quarter of headroom for model wording changes without letting the
+cost drift unnoticed. Output tokens are about 83% of the dollar cost (output is
+priced much higher than input), so the real risk is the model writing longer
+outfit suggestions. The 2,000 per-run cap exists because a mean can hide one
+runaway answer.
+
+## 5. The original behavior still works: a matching query returns a fit card
+
+Run `vintage graphic tee under $30` 5 times. In each, `session["fit_card"]`
+is a non-empty string and `session["error"]` is `None`. **5 of 5 per trial.**
+
+**Why this target:** This is the regression check, because an extension that
+breaks what it extends has failed. Unit 3's version of this criterion was 4 of
+5; I'm asking for 5 of 5 now because unit 4 added retry on 503 errors, which
+was aimed at exactly the failures that used to cost me the fifth run. It can
+still miss if the service stays unavailable through all retries, and if it
+does, that's a finding about the model dependency and not about my code.
