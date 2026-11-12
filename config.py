@@ -86,6 +86,12 @@ REQUESTS_PER_MINUTE = 15
 SESSION_REQUEST_BUDGET = 300
 MAX_RETRIES = 5
 
+# Capstone improvement: stop waiting on a model request after this many seconds
+# and retry it. Normal calls took 0.7-3.8 s (stage_timing.py); the spikes that
+# broke the latency criterion took 17-21 s. Enforced client-side because the
+# API itself rejects any deadline under 10 s.
+MODEL_TIMEOUT_S = 6.0
+
 CACHE_DIR = ROOT / ".cache"
 
 

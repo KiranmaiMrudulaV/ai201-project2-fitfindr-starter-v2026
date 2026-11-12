@@ -201,6 +201,35 @@ def _record_tokens(response) -> None:
 # ─── The call ────────────────────────────────────────────────────────────────
 
 
+def _call_with_timeout(fn, seconds: float):
+    """
+    Run fn() and give up waiting after `seconds`, raising TimeoutError.
+
+    The request runs in a daemon thread so a stuck one can be abandoned: the
+    program can still exit, and the caller can retry straight away. The
+    abandoned request may still finish on the service's side (and be billed);
+    its answer is simply dropped.
+    """
+    import threading
+
+    box: dict = {}
+
+    def worker():
+        try:
+            box["value"] = fn()
+        except Exception as exc:  # noqa: BLE001 — re-raised in the caller
+            box["error"] = exc
+
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
+    thread.join(seconds)
+    if thread.is_alive():
+        raise TimeoutError(f"model request timed out after {seconds:.0f}s")
+    if "error" in box:
+        raise box["error"]
+    return box["value"]
+
+
 def _explain(exc: Exception) -> str:
     """Turn a provider exception into something a person can act on."""
     message = str(exc).lower()
@@ -312,7 +341,10 @@ def generate(
                 "config": call_config,
             }
 
-            response = client.models.generate_content(**kwargs)
+            response = _call_with_timeout(
+                lambda: client.models.generate_content(**kwargs),
+                config.MODEL_TIMEOUT_S,
+            )
             _record_tokens(response)
             text = (response.text or "").strip()
 
@@ -339,10 +371,16 @@ def generate(
                 or "unavailable" in message
                 or ("high" in message and "demand" in message)
             )
-            if not (rate_limited or transiently_unavailable):
+            # Capstone improvement: our own timeout is retried, not fatal.
+            timed_out = isinstance(exc, TimeoutError)
+            if not (rate_limited or transiently_unavailable or timed_out):
                 raise ModelUnavailable(_explain(exc)) from exc
             backoff = _retry_delay(exc, attempt)
-            reason = "rate limit" if rate_limited else "service unavailable"
+            reason = (
+                "rate limit" if rate_limited
+                else "timeout" if timed_out
+                else "service unavailable"
+            )
             print(
                 f"  [{reason}] service pushed back. Waiting {backoff:.0f}s "
                 f"(attempt {attempt + 1} of {config.MAX_RETRIES}). This is "
