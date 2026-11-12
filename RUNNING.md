@@ -1,3 +1,74 @@
+# Running FitFindr (capstone run path — Path B, local with logs)
+
+FitFindr runs on your own machine and calls a hosted model API. Nothing is
+deployed to a host. Every run appends one JSON record to `logs/runs.jsonl`.
+
+## Environment
+
+| Needs | Detail |
+|---|---|
+| Python | 3.11, 3.12 or 3.13. Tested on **3.12.3**. Not 3.14 (the pinned packages don't support it yet). |
+| Dependencies | Pinned with lower and upper bounds in `requirements.txt` (`python-dotenv`, `google-genai`, `mcp`, `flask`, `gunicorn`). |
+| Model files | **None.** The model (`gemini-3.5-flash-lite`) runs on Google's servers. Nothing is downloaded and there is no local model. |
+| API key | A `GEMINI_API_KEY` in a `.env` file you create (see below). Never commit `.env`. |
+| Network | Required, for every run that reaches the model. |
+
+## Start command
+
+From a fresh clone. Windows (PowerShell):
+
+```powershell
+git clone https://github.com/KiranmaiMrudulaV/ai201-project2-fitfindr-starter-v2026.git
+cd ai201-project2-fitfindr-starter-v2026
+py -3.12 -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+copy .env.example .env          # then open .env and paste your GEMINI_API_KEY
+python test.py                  # environment check, should pass
+python app.py ask 'vintage graphic tee under $30'
+```
+
+macOS / Linux: use `python3 -m venv .venv`, `source .venv/bin/activate`
+and `cp .env.example .env`; the rest is identical.
+
+**The one command that runs the system:**
+
+```
+python app.py ask 'vintage graphic tee under $30'
+```
+
+Use single quotes. In PowerShell, double quotes turn `$30` into an empty
+variable and the price limit silently vanishes. Add `--trace` to see each step.
+Set `AI201_CACHE=0` (PowerShell: `$env:AI201_CACHE='0'`) to turn off the
+response cache, which you need for honest latency and cost numbers.
+
+## Reading the log
+
+Each run appends one line to `logs/runs.jsonl`: `timestamp`, `query`, `status`
+(`ok`, `empty_search`, `model_unavailable` or `exception`), `output`, `error`,
+`selected_item_id`, `dropped_constraint`, `duration_s`, `cache_enabled`,
+`model_calls`, `prompt_tokens` and `output_tokens`. To see the last run:
+
+```
+python -c "import runlog; print(runlog.read_runs()[-1])"
+```
+
+## What to expect
+
+- Every run takes roughly 9 to 12 seconds, not just the first. Each tool call
+  over MCP starts a fresh server subprocess (`mcp_client.py::_call`), and that
+  startup is paid every time. A run that stops at the empty search, with no
+  model call at all, still took about 9 seconds in my first test.
+- If you see `No module named 'mcp'`, you are running the system Python and not
+  the venv. Activate `.venv` and try again.
+- A rate-limit pause message is the starter pacing you; it is not a bug.
+
+---
+
+# Starter reference (original RUNNING.md)
+
+The rest of this file is the starter's original reference, unchanged.
+
 # Running FitFindr
 
 Everything about how the starter works and how to use it.
