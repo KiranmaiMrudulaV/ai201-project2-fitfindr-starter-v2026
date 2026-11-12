@@ -784,3 +784,155 @@ Out of scope, on purpose:
 - No new tools and no changes to the planning loop's branching. The agent's behavior stays as unit 4 left it.
 - No hosting (Path A), no web UI work, and no changes to `serve.py`.
 - No changes to the parsing or search logic, even though the regex parser has known limits (see What's Still Broken in the unit 4 sections above).
+
+
+**Running It**
+
+**Path B — local with logs.** FitFindr runs on my machine and calls a hosted model API, so there is nothing to deploy and no model file to download. The exact start command, the Python version (tested on 3.12.3, not 3.14), the pinned dependencies and the `.env` setup are in [RUNNING.md](RUNNING.md). I tested it by cloning the repo into a fresh folder, creating a new venv, running `pip install -r requirements.txt`, then `python test.py` (10 of 10 passed) and `python app.py ask 'vintage graphic tee under $30'`, which produced a fit card and a log record (`status ok, 12.2 s, 551 + 307 tokens`). I expected the instructions to fail the first time; they didn't, so I found nothing to fix. Without a real key `python test.py` says "no key to test with", which is a clear message for a reader. The only environment trap I hit was running the system Python instead of the venv, which fails with `No module named 'mcp'`; RUNNING.md now says so.
+
+**Instrumentation**
+
+`runlog.py::log_run` appends one JSON line per run to `logs/runs.jsonl`. It is called from `agent.py::run_agent`, which wraps the unchanged loop (`_run_loop`) in a try/except, so runs that crash write a record too. Fields: `timestamp` (UTC), `query` (what came in), `status` (`ok`, `empty_search`, `model_unavailable` or `exception`), `output` (the fit card or the stop message), `error`, `selected_item_id`, `dropped_constraint`, `duration_s`, `cache_enabled`, `model_calls`, `prompt_tokens`, `output_tokens`. Token counts are the difference in `generate.token_counts()` before and after the run.
+
+Twelve real entries, copied from `logs/runs.jsonl` in order. Only `output` and `error` are shortened to 70 characters here for readability; the file has them in full. The first entry is a crash (system Python without the `mcp` package), the fourth is a wrong-key run, and the second is an impossible query:
+
+```
+{"timestamp": "2026-11-12T02:23:22+00:00", "query": "designer ballgown size XXS under $5", "status": "exception", "output": null, "error": "MCPError: Couldn't call 'search_listings' over MCP: No module named 'm…", "duration_s": 0.004, "cache_enabled": true, "model_calls": 0, "prompt_tokens": 0, "output_tokens": 0}
+{"timestamp": "2026-11-12T02:24:00+00:00", "query": "designer ballgown size XXS under $5", "status": "empty_search", "output": "No listings matched 'designer ballgown', size XXS, under $5. Try a wid…", "error": "No listings matched 'designer ballgown', size XXS, under $5. Try a wid…", "selected_item_id": null, "dropped_constraint": null, "duration_s": 8.915, "cache_enabled": true, "model_calls": 0, "prompt_tokens": 0, "output_tokens": 0}
+{"timestamp": "2026-11-12T02:24:17+00:00", "query": "vintage graphic tee under $30", "status": "ok", "output": "That pink and purple butterfly graphic is straight out of a 2000s musi…", "error": null, "selected_item_id": "lst_002", "dropped_constraint": null, "duration_s": 11.625, "cache_enabled": false, "model_calls": 2, "prompt_tokens": 569, "output_tokens": 332}
+{"timestamp": "2026-11-12T02:24:33+00:00", "query": "oversized wool coat under $60", "status": "model_unavailable", "output": "The model rejected your API key. Check GEMINI_API_KEY in your .env fil…", "error": "The model rejected your API key. Check GEMINI_API_KEY in your .env fil…", "selected_item_id": "lst_003", "dropped_constraint": null, "duration_s": 9.633, "cache_enabled": false, "model_calls": 1, "prompt_tokens": 0, "output_tokens": 0}
+{"timestamp": "2026-11-12T02:29:17+00:00", "query": "vintage graphic tee under $30", "status": "ok", "output": "Pastel butterflies and the exact kind of tiny baby tee fit I’ve been h…", "error": null, "selected_item_id": "lst_002", "dropped_constraint": null, "duration_s": 12.823, "cache_enabled": false, "model_calls": 2, "prompt_tokens": 629, "output_tokens": 375}
+{"timestamp": "2026-11-12T02:29:23+00:00", "query": "90s track jacket in size M", "status": "ok", "output": "That crisp navy and white piping is doing all the 90s heavy lifting. S…", "error": null, "selected_item_id": "lst_004", "dropped_constraint": null, "duration_s": 5.609, "cache_enabled": false, "model_calls": 2, "prompt_tokens": 566, "output_tokens": 309}
+{"timestamp": "2026-11-12T02:29:29+00:00", "query": "silk slip dress in midi length under $40", "status": "ok", "output": "Scored this dreamy 90s floral midi silk slip dress on Depop for just $…", "error": null, "selected_item_id": "lst_013", "dropped_constraint": null, "duration_s": 5.696, "cache_enabled": false, "model_calls": 2, "prompt_tokens": 631, "output_tokens": 405}
+{"timestamp": "2026-11-12T02:29:35+00:00", "query": "platform sneakers size 8", "status": "ok", "output": "These chunky platform sneakers are giving major '90s model-off-duty en…", "error": null, "selected_item_id": "lst_019", "dropped_constraint": null, "duration_s": 6.071, "cache_enabled": false, "model_calls": 2, "prompt_tokens": 585, "output_tokens": 361}
+{"timestamp": "2026-11-12T02:29:40+00:00", "query": "denim jacket under $50", "status": "ok", "output": "That vintage Wrangler denim fit is finally hitting the sweet spot with…", "error": null, "selected_item_id": "lst_007", "dropped_constraint": null, "duration_s": 5.714, "cache_enabled": false, "model_calls": 2, "prompt_tokens": 611, "output_tokens": 352}
+{"timestamp": "2026-11-12T02:29:46+00:00", "query": "vintage graphic tee under $30", "status": "ok", "output": "Channeling total 2000s mall-rat energy with this tiny butterfly tee I …", "error": null, "selected_item_id": "lst_002", "dropped_constraint": null, "duration_s": 5.585, "cache_enabled": false, "model_calls": 2, "prompt_tokens": 550, "output_tokens": 318}
+{"timestamp": "2026-11-12T02:29:52+00:00", "query": "90s track jacket in size M", "status": "ok", "output": "Nothing beats that crisp 90s athletic drape, especially when you find …", "error": null, "selected_item_id": "lst_004", "dropped_constraint": null, "duration_s": 5.697, "cache_enabled": false, "model_calls": 2, "prompt_tokens": 527, "output_tokens": 280}
+{"timestamp": "2026-11-12T02:30:16+00:00", "query": "silk slip dress in midi length under $40", "status": "ok", "output": "Nothing beats a dreamy 90s floral silk midi when you want to lean into…", "error": null, "selected_item_id": "lst_013", "dropped_constraint": null, "duration_s": 24.421, "cache_enabled": false, "model_calls": 2, "prompt_tokens": 630, "output_tokens": 389}
+```
+
+Failed runs are in the list above: entry 1 is `status exception` (a crash, re-raised after logging), entry 2 is `empty_search`, and entry 4 is `model_unavailable` (wrong API key, 0 tokens, because the request was rejected).
+
+**What It Costs**
+
+Measured with `measure_cost.py`: 10 runs through `agent.run_agent` with the cache off (so every token is real), five different queries run twice, each run given the same fresh example wardrobe so style memory could not lengthen the prompts. All 10 finished `ok`. Numbers come from the service's own usage report (`generate.token_counts()`), summed per run in the log, not from a pricing page.
+
+| Measure | Mean | Min | Max |
+|---|---|---|---|
+| Model calls per run | 2.00 | 2 | 2 |
+| Prompt tokens | 590.4 | 527 | 631 |
+| Output tokens | 352.3 | 280 | 405 |
+| Total tokens | 942.7 | | |
+| Seconds per run | 8.54 | 5.58 | 24.42 |
+
+The mean of 8.5 s is pulled up by one slow run; the typical run is about 6.2 s (see the stage breakdown under The Improvement, which also explains the slow runs).
+
+Dollars need a price, and a price is not something I can measure. The listed price for this model is $0.30 per million input tokens and $2.50 per million output tokens (from several third-party price pages, e.g. [eesel.ai](https://eesel.ai/blog/gemini-3-5-flash-lite-pricing) and [pricepertoken.com](https://pricepertoken.com/pricing-page/model/google-gemini-3.5-flash-lite); I could not open Google's own page, so treat the rate as unconfirmed). On the free tier the real bill is $0.
+
+- Input: 590.4 × $0.30 / 1,000,000 = $0.000177
+- Output: 352.3 × $2.50 / 1,000,000 = $0.000881
+- **One run ≈ $0.00106**
+- 100 people a day, one run each: 100 × $0.00106 = **$0.106 a day**, about $3.17 over 30 days.
+
+Output tokens are about 83% of the cost, even though there are fewer of them than input tokens, because they are priced more than eight times higher.
+
+**Run Log and Verdicts**
+
+Five criteria from `criteria.md` ("Capstone criteria"), three trials each, run by `capstone_trials.py --label before` with the cache off. Each criterion is scored from the records the logger wrote.
+
+| Criterion | Target | Trial 1 | Trial 2 | Trial 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. Every run leaves exactly one complete record | 10 of 10 | 10/10 | 10/10 | 10/10 | MET |
+| 2. Bad input and a failing model never crash or look like success | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 3. Normal run under 10 s (cache off, 10 runs in a row) | 9 of 10 | 9/10 | 9/10 | 9/10 | MET (at the edge) |
+| 4. Tokens per run: mean ≤ 1,200, max ≤ 2,000 | both | mean 960, max 1098 | mean 952, max 1070 | mean 941, max 1114 | MET |
+| 5. A matching query still returns a fit card | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+
+Real output underneath. All of it is from `results/capstone_before.md` and the harness output, produced by `capstone_trials.py` (functions `trial_1` to `trial_5`) calling `agent.py::run_agent`.
+
+Criterion 1, trial 1 (per input: query, bad key?, new log lines, outcome, ok):
+
+```
+('vintage graphic tee under $30', False, 1, 'returned', True)
+('90s track jacket in size M', False, 1, 'returned', True)
+('denim jacket under $50', False, 1, 'returned', True)
+('silk slip dress in midi length under $40', False, 1, 'returned', True)
+('designer ballgown size XXS under $5', False, 1, 'returned', True)
+('designer ballgown size XXS under $5', False, 1, 'returned', True)
+('vintage graphic tee under $30', True, 1, 'returned', True)
+('vintage graphic tee under $30', True, 1, 'returned', True)
+('', False, 1, 'returned', True)
+('vintage graphic tee vintage graphic tee …', False, 1, 'returned', True)
+```
+
+Criterion 2, trial 1 (per case; the CLI was run as a subprocess to check for a Traceback):
+
+```
+('empty string', 'raised=False', 'no_traceback=True', 'status=empty_search', True)
+('whitespace only', 'raised=False', 'no_traceback=True', 'status=empty_search', True)
+('3,000 characters', 'raised=False', 'no_traceback=True', 'status=ok', True)
+('wrong API key', 'raised=False', 'no_traceback=True', 'status=model_unavailable', True)
+('impossible query', 'raised=False', 'no_traceback=True', 'status=empty_search', True)
+```
+
+Criteria 3 and 4, harness output (`trial_3_4`, runs over 10 s as `(duration_s, model_calls)`):
+
+```
+trial 1:
+  C3 9/10 under 10s, slow=[(15.293, 2)]
+  C4 mean 960 max 1098
+trial 2:
+  C3 9/10 under 10s, slow=[(20.436, 2)]
+  C4 mean 952 max 1070
+trial 3:
+  C3 9/10 under 10s, slow=[(21.645, 2)]
+  C4 mean 941 max 1114
+```
+
+Criterion 5, trial 1: 5 of 5 runs returned a non-empty `session["fit_card"]` with `session["error"] is None` (the five records are in `results/capstone_before.md`).
+
+**Verdicts and diagnoses.** I met all five in all three trials, so there is no miss to diagnose, and I looked hard at whether the targets were just easy.
+
+- **Criteria 1, 2 and 5** passed legitimately. I checked what the malformed inputs actually did: an empty string and whitespace both stop at `empty_search` with a message, and the 3,000-character query matches a listing and completes. So criterion 2 was a real test, and the agent held up.
+- **Criterion 3 is the weak pass.** It came out exactly 9 of 10 in every trial, and every trial had exactly one run of 15 to 22 s while the other nine mostly took 5.6 to 7.8 s (the longest of them, 9.7 s, was still under the limit). The slow runs are not random model latency. They are the free-tier quota: `generate.py` allows 15 requests per minute (`REQUESTS_PER_MINUTE`), and the test fires one run every ~6 s at 2 model calls each, about 20 calls a minute. The slow run comes when the 15th call of the minute lands, and the harness output has the matching pauses (`[rate limit] 15 requests used this minute. Waiting 16s / 13s / 10s`). So the stage is the pacing in `generate.py::_wait_for_slot`, and the mechanism is that the criterion's "10 runs in a row" pattern exceeds the quota by itself. A single user asking one question a minute would never see it. I never changed the criterion because it was met.
+- **Criterion 4 was set too low.** Means were 941 to 992 against a 1,200 target, and the max was 1,070 to 1,218 against 2,000. I would tighten it to a mean of at most 1,000 and a maximum of 1,250.
+- **Pattern:** the one real weakness (latency under repeated use) comes from a single stage, the request pacing, and it makes the latency criterion measure the quota, not the system.
+
+**The Improvement**
+
+*What I first thought, and what I changed.* A stage breakdown (`stage_timing.py`, 15 runs, cache off) gave a typical run of about 6.2 s: the two MCP calls cost about 1.8 s each (about 58% of a normal run, because each call starts a new server process in `mcp_client.py::_call`), and the two model calls about 1.5 s and 0.9 s. The one slow run, 23 s, had `create_fit_card` at 17.6 s against a 0.9 s median. I read that as a hung model request and changed `generate.py` to stop waiting after `MODEL_TIMEOUT_S = 6.0` s and retry (`_call_with_timeout`, a daemon thread; commit "Improvement: abandon and retry a model call that takes over 6s"). My first version used the SDK's own timeout, and testing it showed the API rejects any deadline under 10 s (`Minimum allowed deadline is 10s`), which would have broken every call, so I enforce the timeout in our own code. I verified both the forced-timeout path (5 retries, then a clean error) and a normal call.
+
+*Run log after the change* (`capstone_trials.py --label after`, same harness, same format):
+
+| Criterion | Target | Trial 1 | Trial 2 | Trial 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. Every run leaves exactly one complete record | 10 of 10 | 10/10 | 10/10 | 10/10 | MET |
+| 2. Bad input and a failing model never crash or look like success | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 3. Normal run under 10 s | 9 of 10 | 9/10 | 9/10 | 9/10 | MET (at the edge) |
+| 4. Tokens per run | mean ≤ 1,200, max ≤ 2,000 | mean 992, max 1218 | mean 992, max 1073 | mean 949, max 1038 | MET |
+| 5. A matching query still returns a fit card | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+
+Side by side with "Run Log and Verdicts" above: identical verdicts, and the slow run in each batch is still there (before: 15.3, 20.4, 21.6 s; after: 22.4, 47.3, 25.6 s).
+
+*Did it help? No.* The timeout fired zero times in the whole after-run (no `[timeout]` message anywhere), which is the giveaway: if the slow runs were hung model requests, a 6 s timeout would have caught them. They were the rate limiter instead. The after-run output lists `[rate limit] 15 requests used this minute. Waiting 21s / 19s / 16s / 12s`, and a real server-side 429 (`Waiting 39s`) accounts for the 47 s run, which also shows 3 model calls instead of 2. The same pauses appear in the before-run. I had misread the 17.6 s in my timing run: that was the 16th request inside a minute. So I aimed the fix at the wrong stage. The corrected diagnosis is the one in "Verdicts and diagnoses": the stage is `generate.py`'s request pacing, and the lesson is that one slow sample told me where to look but not why.
+
+*What it cost.* Nothing measurable in this data, but the change has a downside I can name: an abandoned request may still be billed by the service, and its tokens never reach the log, so the log can under-count cost whenever a timeout fires.
+
+**What's Still Broken**
+
+- **Criterion 3 (MET, but only because of the 9-of-10 allowance).** A strict 10-of-10 would have missed in all three trials, because the test itself exceeds the free-tier quota. What I would do: re-measure latency with runs spaced about 9 seconds apart (7 runs a minute is the limit at 2 calls per run), and write the criterion that way. I stopped because the unit was out of time and the honest fix is a new measurement, not more code. I left the original criterion in place.
+- **The timeout change did not help.** I would revert it. It adds a thread and a billing risk with no demonstrated benefit. I kept it in the history, with the evidence above, because removing it would erase the diagnosis.
+- **58% of a normal run is MCP startup** (two server processes at about 1.8 s each). A single long-lived MCP session would remove about 3.6 s of a 6.2 s run. I scoped it out because it changes `mcp_client.py`, and the scope I declared was a log, not a speed-up.
+- **Criterion 4 was set too low** (see above): tighten to a mean of at most 1,000 and a max of 1,250.
+- **Not built:** hosting (Path A), and the per-call token log does not include abandoned requests.
+
+*The one thing I would do first:* the spaced-out latency measurement. Every other speed decision (reverting the timeout, persisting the MCP session) depends on knowing the real per-run latency, and right now my only number includes the quota pauses.
+
+*Stretch, not claimed.* I built a latency breakdown (`stage_timing.py`) but did not declare it in the README before building it, so I am not claiming the extra credit; the results are used in the diagnosis above.
+
+**How I Used AI**
+
+I worked in Claude Code, and at my request it wrote the capstone code, the criteria in `criteria.md` (drafted from numbers it had measured first), and these README sections. I am saying so plainly because the brief asks for criteria written by the student. Two specific moments:
+
+1. **The timeout.** I asked for a fix for the slow runs. Claude first proposed the SDK's `http_options` timeout of 8 s. Before committing it, Claude tested the failure path and found the API returns `400 INVALID_ARGUMENT: Manually set deadline 1s is too short. Minimum allowed deadline is 10s`. That would have failed every call, and the retry check would have retried each one. I switched to a client-side timeout in a daemon thread (`generate.py::_call_with_timeout`) and kept the 6 s value.
+2. **The diagnosis.** Claude's first diagnosis, from one slow `create_fit_card` in the timing run, was a hung model request. The after-run contradicted it: no timeout ever fired, and the output was full of `[rate limit] 15 requests used this minute` pauses that matched the slow runs. I replaced the diagnosis with the quota explanation and reported the improvement as not helping.
