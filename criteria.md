@@ -127,7 +127,9 @@ model's output, this one should hold 5 of 5 every time, not 4 of 5.
 
 ---
 
-# Capstone criteria (unit 9)
+# Capstone criteria (unit 9) — Claude's first draft, SUPERSEDED
+
+> **Superseded.** Claude drafted this set at my request before I wrote my own. My own criteria are the section at the bottom of this file, and those are the ones scored. I'm keeping this draft unedited so the history is honest.
 
 Five criteria for the capstone extension: the structured run log, the run
 path, and the cost measurement around the FitFindr agent. Written before any
@@ -212,3 +214,69 @@ breaks what it extends has failed. Unit 3's version of this criterion was 4 of
 was aimed at exactly the failures that used to cost me the fifth run. It can
 still miss if the service stays unavailable through all retries, and if it
 does, that's a finding about the model dependency and not about my code.
+
+---
+
+# Capstone criteria (unit 9) — mine
+
+These are the five criteria I wrote myself for the capstone extension (run log,
+run path, cost). Claude only typed them into this file from what I wrote.
+Each is scored over **3 trials** with the response cache off (`AI201_CACHE=0`).
+
+## 1. Every run leaves exactly one record
+
+Each run must add exactly one line to `logs/runs.jsonl`. Zero new lines means a
+missing record; more than one means duplicate records. Test: a batch of 5 runs,
+including 1 bad input and 1 wrong API key, must add exactly 5 new lines. **5 of 5
+trials.**
+
+**Why this target:** A duplicate record costs storage and money and makes the log
+more complex to read. A missing record is worse, because it shows no feedback at
+all that the run happened.
+
+## 2. A classmate can start it alone from RUNNING.md
+
+Two of two testers must follow RUNNING.md without any help from me. Both use the
+exact example query in RUNNING.md for all five runs. Each must finish setup
+within 5 minutes and five runs within another 5 minutes. At least 4 of 5 runs
+each must print a non-empty fit card; a `stopped:` message does not count.
+Existing Python 3.12, Gemini keys, and shared dependencies are prerequisites, so
+the usual 20-minute installation is excluded. **2 of 2 testers.**
+
+**Why this target:** The 20-minute install is skipped because these testers
+already built their own projects with the same setup, so what is tested is my
+instructions, not their machines. 10 minutes in total is reasonable and generous,
+and because it is generous, 4 of 5 fit cards is a fair bar.
+
+## 3. One run stays cheap
+
+Using $0.30 per million input tokens and $2.50 per million output tokens (from
+third-party pricing pages), average 10 uncached runs with a fresh example
+wardrobe and different queries, using `measure_cost.py` and the token counts in
+`logs/runs.jsonl`. **Target: at most $0.001 per run, which is $10 a day for 10,000
+runs.** Current estimate: $0.00106 per run ($10.60 a day), so it fails
+provisionally.
+
+**Why this target:** $10 a day is my budget for 100 users making 100 runs each.
+
+## 4. Bad input should not crash the system
+
+Test an empty query, a 3,000-character query repeating "vintage graphic tee",
+symbols only, an unsupported-language query, and an invalid API key. All 5 of 5
+must finish without a Python Traceback. The four failing inputs must also print a
+non-empty message naming the problem. A non-zero exit is acceptable if the only
+output is that message. I predict the symbols-only and unsupported-language
+queries will return "No listings matched". **5 of 5.**
+
+**Why this target:** Invalid inputs should give useful feedback, while a long
+valid query should still work.
+
+## 5. The original behavior still works as is
+
+Run three fixed queries against the same wardrobe: two with known matches and one
+with none. `_run_loop` and `run_agent` must select the same item and print
+non-empty fit cards for both matching queries; both must report no match for the
+third. I record the exact queries and the expected item IDs before testing.
+**Target: 3 of 3 comparisons.**
+
+**Why this target:** Logging should preserve the original behavior.
