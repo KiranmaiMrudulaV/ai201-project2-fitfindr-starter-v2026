@@ -838,7 +838,9 @@ Output tokens are about 83% of the cost, even though there are fewer of them tha
 
 **Run Log and Verdicts**
 
-Five criteria from `criteria.md` ("Capstone criteria"), three trials each, run by `capstone_trials.py --label before` with the cache off. Each criterion is scored from the records the logger wrote.
+> **Scored against Claude's first draft of the criteria, not mine.** These five criteria were drafted by Claude, not by me, and have since been superseded (see How I Used AI). The tables below are kept as a record. The results for my own criteria are further down.
+
+Five criteria from `criteria.md` ("Capstone criteria (unit 9) — Claude's first draft"), three trials each, run by `capstone_trials.py --label before` with the cache off. Each criterion is scored from the records the logger wrote.
 
 | Criterion | Target | Trial 1 | Trial 2 | Trial 3 | Verdict |
 |---|---|---|---|---|---|
@@ -932,7 +934,16 @@ Side by side with "Run Log and Verdicts" above: identical verdicts, and the slow
 
 **How I Used AI**
 
-I worked in Claude Code, and at my request it wrote the capstone code, the criteria in `criteria.md` (drafted from numbers it had measured first), and these README sections. I am saying so plainly because the brief asks for criteria written by the student. Two specific moments:
+I worked in Claude Code, and at my request it wrote the capstone code and the first version of these README sections. The brief asks for criteria written by the student, and that is where this went wrong, so here is what happened and what I did about it.
+
+**What went wrong.** When I asked for help with the capstone, Claude drafted the five criteria in `criteria.md` itself, using the cost numbers it had already measured. It chose the targets, wrote the reasons, ran three trials against them, and I committed the results. All of that was committed under criteria that were not mine. I did not catch it until I read them and asked why Claude had drafted them. Two consequences: the criteria were not my own work, and, because the targets were set knowing the measured averages, criterion 4 (tokens) was easy to meet and criterion 3 (latency) was written knowing it would just pass.
+
+**What I did to fix it.**
+1. I wrote five new criteria myself (one record per run, a classmate starting it alone, cost per run, bad input not crashing, original behavior preserved), with my own numbers and reasons. Claude only gave feedback on whether each one could be tested, for example that "duplicate" needed a definition about log lines and not listings, and that a 3,000-character query might succeed instead of failing. Claude typed my wording into `criteria.md` at my request.
+2. I did not delete the first draft. It stays in `criteria.md`, marked "Claude's first draft, SUPERSEDED", so the history is visible, and my criteria are committed in a separate commit before any new results.
+3. The trials and verdict tables in "Run Log and Verdicts" and "The Improvement" above were scored against that first draft. I am keeping them as a record of what happened, but they are not the verdicts for my criteria. The results for my own criteria are in the sections marked as such, run after my criteria were committed.
+
+Two specific moments:
 
 1. **The timeout.** I asked for a fix for the slow runs. Claude first proposed the SDK's `http_options` timeout of 8 s. Before committing it, Claude tested the failure path and found the API returns `400 INVALID_ARGUMENT: Manually set deadline 1s is too short. Minimum allowed deadline is 10s`. That would have failed every call, and the retry check would have retried each one. I switched to a client-side timeout in a daemon thread (`generate.py::_call_with_timeout`) and kept the 6 s value.
 2. **The diagnosis.** Claude's first diagnosis, from one slow `create_fit_card` in the timing run, was a hung model request. The after-run contradicted it: no timeout ever fired, and the output was full of `[rate limit] 15 requests used this minute` pauses that matched the slow runs. I replaced the diagnosis with the quota explanation and reported the improvement as not helping.
