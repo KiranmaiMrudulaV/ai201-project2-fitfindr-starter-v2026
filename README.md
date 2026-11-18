@@ -872,7 +872,7 @@ What it cost, and what I did not check: outfits are shorter, and I only looked a
 - **Criterion 3 rests on an unconfirmed price.** The rates come from third-party pages, not Google's own, and on the free tier my real bill is $0.
 - **Criterion 4's check is tied to three exact phrases.** A reworded error message would fail the harness even if it were fine for a user.
 - **My criteria are inconsistent about trials.** The section intro says 3 trials each, but criterion 1 says "5 of 5 trials". I ran 5 for criterion 1 and 3 for the rest.
-- **The timeout change from the first draft is still in the code** (`generate.py::_call_with_timeout`) with no demonstrated benefit (see below). I still think it should be reverted.
+- **The timeout change from the first draft is reverted.** It showed no benefit (zero timeouts fired, see below), so I undid it with `git revert` (`ce12d51`) instead of rewriting history. The original commit `ec35e49` stays in the log. The code now has no client-side timeout, and the 5-retry logic is as it was before.
 - **About 58% of a normal run is MCP startup**, unchanged.
 
 ---
@@ -966,7 +966,7 @@ Side by side with "Run Log and Verdicts" above: identical verdicts, and the slow
 **What's Still Broken (superseded draft criteria)**
 
 - **Criterion 3 (MET, but only because of the 9-of-10 allowance).** A strict 10-of-10 would have missed in all three trials, because the test itself exceeds the free-tier quota. What I would do: re-measure latency with runs spaced about 9 seconds apart (7 runs a minute is the limit at 2 calls per run), and write the criterion that way. I stopped because the unit was out of time and the honest fix is a new measurement, not more code. I left the original criterion in place.
-- **The timeout change did not help.** I would revert it. It adds a thread and a billing risk with no demonstrated benefit. I kept it in the history, with the evidence above, because removing it would erase the diagnosis.
+- **The timeout change did not help.** I have since reverted it (`ce12d51`). It added a thread and a billing risk with no demonstrated benefit. The original commit stays in the history, with the evidence above, because removing it would erase the diagnosis.
 - **58% of a normal run is MCP startup** (two server processes at about 1.8 s each). A single long-lived MCP session would remove about 3.6 s of a 6.2 s run. I scoped it out because it changes `mcp_client.py`, and the scope I declared was a log, not a speed-up.
 - **Criterion 4 was set too low** (see above): tighten to a mean of at most 1,000 and a max of 1,250.
 - **Not built:** hosting (Path A), and the per-call token log does not include abandoned requests.
