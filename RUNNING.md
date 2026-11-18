@@ -59,6 +59,10 @@ python -c "import runlog; print(runlog.read_runs()[-1])"
   over MCP starts a fresh server subprocess (`mcp_client.py::_call`), and that
   startup is paid every time. A run that stops at the empty search, with no
   model call at all, still took about 9 seconds in my first test.
+- Timed on a fresh clone: setup (clone, venv, install, `test.py`) took about
+  2 minutes 20 seconds with a full install; five runs of the query above took
+  about 46 seconds and each printed a fit card. If you already have Python 3.12
+  and the packages, setup is much shorter. You still need your own `GEMINI_API_KEY`.
 - If you see `No module named 'mcp'`, you are running the system Python and not
   the venv. Activate `.venv` and try again.
 - A rate-limit pause message is the starter pacing you; it is not a bug.

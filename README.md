@@ -788,7 +788,7 @@ Out of scope, on purpose:
 
 **Running It**
 
-**Path B — local with logs.** FitFindr runs on my machine and calls a hosted model API, so there is nothing to deploy and no model file to download. The exact start command, the Python version (tested on 3.12.3, not 3.14), the pinned dependencies and the `.env` setup are in [RUNNING.md](RUNNING.md). I tested it by cloning the repo into a fresh folder, creating a new venv, running `pip install -r requirements.txt`, then `python test.py` (10 of 10 passed) and `python app.py ask 'vintage graphic tee under $30'`, which produced a fit card and a log record (`status ok, 12.2 s, 551 + 307 tokens`). I expected the instructions to fail the first time; they didn't, so I found nothing to fix. Without a real key `python test.py` says "no key to test with", which is a clear message for a reader. The only environment trap I hit was running the system Python instead of the venv, which fails with `No module named 'mcp'`; RUNNING.md now says so.
+**Path B — local with logs.** FitFindr runs on my machine and calls a hosted model API, so there is nothing to deploy and no model file to download. The exact start command, the Python version (tested on 3.12.3, not 3.14), the pinned dependencies and the `.env` setup are in [RUNNING.md](RUNNING.md). I tested it by cloning the repo into a fresh folder, creating a new venv, running `pip install -r requirements.txt`, then `python test.py` (10 of 10 passed) and `python app.py ask 'vintage graphic tee under $30'`, which produced a fit card and a log record (`status ok, 12.2 s, 551 + 307 tokens`). I expected the instructions to fail the first time; they didn't, so I found nothing to fix. Without a real key `python test.py` says "no key to test with", which is a clear message for a reader. The only environment trap I hit was running the system Python instead of the venv, which fails with `No module named 'mcp'`; RUNNING.md now says so. I later timed a second clean clone of the pushed code, following RUNNING.md step by step: clone 2 s, new venv 27 s, `pip install` 108 s, `python test.py` passed at 143 s in total, and then five runs of the exact RUNNING.md query took 46 s and printed a fit card 5 of 5 times (189 s from start to the fifth fit card). That is a dry run by me, not a score for criterion 2: I copied my own `.env` instead of pasting a key, I knew the steps, and my classmates will skip most of the install.
 
 **Instrumentation**
 
@@ -847,7 +847,7 @@ These are the five criteria I wrote myself in `criteria.md` ("Capstone criteria 
 | Criterion | Target | Before | After |
 |---|---|---|---|
 | 1. Every run leaves exactly one record | batch of 5 adds 5 lines, 5 of 5 trials | 5 of 5 trials MET | 5 of 5 trials MET |
-| 2. A classmate starts it alone from RUNNING.md | 2 of 2 testers | not scored yet | not scored yet |
+| 2. A classmate starts it alone from RUNNING.md | 2 of 2 testers | not scored yet (my dry run: 143 s setup, 5/5 fit cards) | not scored yet |
 | 3. Cost per run | at most $0.001 | $0.00103, $0.00113, $0.00114 **MISSED** | $0.00051, $0.00052, $0.00050 MET |
 | 4. Bad input does not crash | 5 of 5 | 4/5 in all three trials **MISSED** (strict check) | 5/5 in all three trials MET |
 | 5. Original behavior preserved | 3 of 3 comparisons | 3/3 in all three trials MET | 3/3 in all three trials MET |
@@ -868,7 +868,7 @@ Two small changes, one per missed criterion, each followed by a full re-run.
 What it cost, and what I did not check: outfits are shorter, and I only looked at samples. They still name specific pieces and the fit cards still mention price and platform, and `test.py` still passes 10 of 10, but I did **not** re-run the unit 3 criteria, so I cannot say the shorter outfits did not hurt fit-card quality in general. Also, the empty-query check lives in the CLI, so a caller using `run_agent("")` directly gets the original "No listings matched" message instead.
 
 **What's Still Broken (my criteria)**
-- **Criterion 2 is unscored.** It needs two classmates following RUNNING.md alone, with a timer. I should also do a dry run on a fresh clone first, because their other projects may not have `mcp` installed. This is the most important gap.
+- **Criterion 2 is unscored.** It needs two classmates following RUNNING.md alone, with a timer. I did the dry run on a fresh clone (143 s to a passing `test.py` including a full install, 46 s for five runs, 5 of 5 fit cards), so I expect to be well inside 5 + 5 minutes, but that run had my own key pre-copied and my own knowledge of the steps. What it did not test: pasting a key into `.env`, a slow network, a reader seeing the steps for the first time, and whether their Python is 3.12 and their other projects have `mcp` installed (it fails with `No module named 'mcp'` on the wrong one). This is the most important gap.
 - **Criterion 3 rests on an unconfirmed price.** The rates come from third-party pages, not Google's own, and on the free tier my real bill is $0.
 - **Criterion 4's check is tied to three exact phrases.** A reworded error message would fail the harness even if it were fine for a user.
 - **My criteria are inconsistent about trials.** The section intro says 3 trials each, but criterion 1 says "5 of 5 trials". I ran 5 for criterion 1 and 3 for the rest.
