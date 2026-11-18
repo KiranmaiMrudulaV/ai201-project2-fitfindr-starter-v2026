@@ -185,7 +185,8 @@ def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
         prompt = (
             f"Someone is considering thrifting this item: {item_desc}.\n"
             "They don't have any wardrobe saved yet. Give general styling "
-            "advice for one or two outfits this item could work in."
+            "advice for one or two outfits this item could work in. "
+            "Keep the whole answer under 60 words."
         )
     else:
         wardrobe_lines = "\n".join(
@@ -196,7 +197,8 @@ def suggest_outfit(new_item: dict, wardrobe: dict) -> str:
             f"Someone is considering thrifting this item: {item_desc}.\n"
             f"Here is their existing wardrobe:\n{wardrobe_lines}\n\n"
             "Suggest one or two outfits that pair the new item with specific "
-            "pieces they already own. Name the pieces."
+            "pieces they already own. Name the pieces. "
+            "Keep the whole answer under 60 words."
         )
 
     return generate(prompt)
