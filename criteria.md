@@ -252,7 +252,11 @@ and because it is generous, 4 of 5 fit cards is a fair bar.
 > Setup finishes within 5 minutes and at least 4 of 5 runs of the RUNNING.md
 > query print a non-empty fit card (a `stopped:` message does not count), in
 > **3 of 3 trials**. Each trial uses a fresh clone in a new folder and a new
-> venv. I paste the API key by hand, and that step is inside the timer.
+> venv. I paste the API key by hand, and that step is inside the timer. The
+> timing is done by `timed_trial.ps1`, which runs the RUNNING.md commands for me
+> and waits at a hidden prompt for the key, so it shows the commands work from a
+> clean clone but does not test whether the written instructions are clear to a
+> reader.
 >
 > **Why revised:** The two-classmate test can only happen at Demo Day, after the
 > capstone deadline. This revision checks whether I can get a fit card using only
