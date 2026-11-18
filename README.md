@@ -836,7 +836,50 @@ Dollars need a price, and a price is not something I can measure. The listed pri
 
 Output tokens are about 83% of the cost, even though there are fewer of them than input tokens, because they are priced more than eight times higher.
 
-**Run Log and Verdicts**
+**What It Costs, after my improvement**
+
+Same method, from the log, priced at $0.30 in and $2.50 out per million tokens (third-party pages, unconfirmed; the real free-tier bill is $0). Before the improvement an average two-call run used 602.7 prompt and 369.3 output tokens, which is $0.00110. After capping the outfit suggestion at 60 words it used 403.1 prompt and 157.6 output tokens, which is $0.00052. At my budget of 100 users making 100 runs each (10,000 runs) that is about $5 a day instead of about $11. (Means are over every `ok` two-call run in each batch of trials, 53 before and 48 after.)
+
+**Run Log and Verdicts (my criteria)**
+
+These are the five criteria I wrote myself in `criteria.md` ("Capstone criteria (unit 9) - mine"). They were committed in `57f3c0e`, before any of these results. They are scored by `capstone_trials_mine.py`. Criterion 2 is scored by hand with two classmates and **has not been scored yet** (see What's Still Broken). Criterion 1 runs 5 trials because it says "5 of 5 trials"; the others run 3. Raw output: `results/capstone_mine_before.md`, `results/capstone_mine_after.md`.
+
+| Criterion | Target | Before | After |
+|---|---|---|---|
+| 1. Every run leaves exactly one record | batch of 5 adds 5 lines, 5 of 5 trials | 5 of 5 trials MET | 5 of 5 trials MET |
+| 2. A classmate starts it alone from RUNNING.md | 2 of 2 testers | not scored yet | not scored yet |
+| 3. Cost per run | at most $0.001 | $0.00103, $0.00113, $0.00114 **MISSED** | $0.00051, $0.00052, $0.00050 MET |
+| 4. Bad input does not crash | 5 of 5 | 4/5 in all three trials **MISSED** (strict check) | 5/5 in all three trials MET |
+| 5. Original behavior preserved | 3 of 3 comparisons | 3/3 in all three trials MET | 3/3 in all three trials MET |
+
+One honest detail about criterion 4. The first "before" run reported 5/5, because my script counted any non-empty output as "a message naming the problem". I then ran the CLI by hand and saw that `python app.py ask ""` does not run the agent. It drops into the interactive prompt and prints "Ask for something, or press Enter on an empty line to quit.", which names no problem. I tightened the check to require a real problem message ("No listings matched", "rejected your API key" or "Nothing to search for") and re-scored. The before verdict above is the strict one (4/5, the empty query failing each time). The loose 5/5 is still in `results/capstone_mine_before.md`.
+
+**Diagnoses.**
+- **Criterion 3 (cost).** Output tokens were about 83% of the cost, because they are priced more than eight times higher than input. The longest and least bounded output was `suggest_outfit` ("one or two outfits", no length limit), and its text is also the input to `create_fit_card`, so it inflated both calls. That is the stage to change.
+- **Criterion 4 (empty query).** The failing stage is `app.py::cmd_ask`. An empty argument is falsy, so `if args.query:` skipped the agent and fell into the interactive prompt branch. The agent itself was fine.
+- **Criteria 1 and 5** held in every trial. Criterion 5 is a regression check that is easy by design: the selected item comes from search, not from the model, so it was never likely to fail.
+
+**The Improvement (my criteria)**
+
+Two small changes, one per missed criterion, each followed by a full re-run.
+1. **Cost** (`tools.py`): both `suggest_outfit` prompts now end with "Keep the whole answer under 60 words." Result: $0.0011 to $0.0005 per run, and criterion 3 went from MISSED to MET with about 2x headroom. That is a bigger drop than I expected. I only needed about 10%.
+2. **Empty query** (`app.py::cmd_ask`): an empty or whitespace-only `ask` argument now prints "Nothing to search for. Type what you're looking for, for example: vintage graphic tee under $30" and writes one record (status `empty_search`, 0 model calls), so it still counts as one run with one record. Result: criterion 4 went from 4/5 to 5/5.
+
+What it cost, and what I did not check: outfits are shorter, and I only looked at samples. They still name specific pieces and the fit cards still mention price and platform, and `test.py` still passes 10 of 10, but I did **not** re-run the unit 3 criteria, so I cannot say the shorter outfits did not hurt fit-card quality in general. Also, the empty-query check lives in the CLI, so a caller using `run_agent("")` directly gets the original "No listings matched" message instead.
+
+**What's Still Broken (my criteria)**
+- **Criterion 2 is unscored.** It needs two classmates following RUNNING.md alone, with a timer. I should also do a dry run on a fresh clone first, because their other projects may not have `mcp` installed. This is the most important gap.
+- **Criterion 3 rests on an unconfirmed price.** The rates come from third-party pages, not Google's own, and on the free tier my real bill is $0.
+- **Criterion 4's check is tied to three exact phrases.** A reworded error message would fail the harness even if it were fine for a user.
+- **My criteria are inconsistent about trials.** The section intro says 3 trials each, but criterion 1 says "5 of 5 trials". I ran 5 for criterion 1 and 3 for the rest.
+- **The timeout change from the first draft is still in the code** (`generate.py::_call_with_timeout`) with no demonstrated benefit (see below). I still think it should be reverted.
+- **About 58% of a normal run is MCP startup**, unchanged.
+
+---
+
+*The sections below were written against Claude's first draft of the criteria, which I superseded. They are kept as a record of what happened, not as my verdicts.*
+
+**Run Log and Verdicts (superseded draft criteria)**
 
 > **Scored against Claude's first draft of the criteria, not mine.** These five criteria were drafted by Claude, not by me, and have since been superseded (see How I Used AI). The tables below are kept as a record. The results for my own criteria are further down.
 
@@ -900,7 +943,7 @@ Criterion 5, trial 1: 5 of 5 runs returned a non-empty `session["fit_card"]` wit
 - **Criterion 4 was set too low.** Means were 941 to 992 against a 1,200 target, and the max was 1,070 to 1,218 against 2,000. I would tighten it to a mean of at most 1,000 and a maximum of 1,250.
 - **Pattern:** the one real weakness (latency under repeated use) comes from a single stage, the request pacing, and it makes the latency criterion measure the quota, not the system.
 
-**The Improvement**
+**The Improvement (superseded draft criteria)**
 
 *What I first thought, and what I changed.* A stage breakdown (`stage_timing.py`, 15 runs, cache off) gave a typical run of about 6.2 s: the two MCP calls cost about 1.8 s each (about 58% of a normal run, because each call starts a new server process in `mcp_client.py::_call`), and the two model calls about 1.5 s and 0.9 s. The one slow run, 23 s, had `create_fit_card` at 17.6 s against a 0.9 s median. I read that as a hung model request and changed `generate.py` to stop waiting after `MODEL_TIMEOUT_S = 6.0` s and retry (`_call_with_timeout`, a daemon thread; commit "Improvement: abandon and retry a model call that takes over 6s"). My first version used the SDK's own timeout, and testing it showed the API rejects any deadline under 10 s (`Minimum allowed deadline is 10s`), which would have broken every call, so I enforce the timeout in our own code. I verified both the forced-timeout path (5 retries, then a clean error) and a normal call.
 
@@ -920,7 +963,7 @@ Side by side with "Run Log and Verdicts" above: identical verdicts, and the slow
 
 *What it cost.* Nothing measurable in this data, but the change has a downside I can name: an abandoned request may still be billed by the service, and its tokens never reach the log, so the log can under-count cost whenever a timeout fires.
 
-**What's Still Broken**
+**What's Still Broken (superseded draft criteria)**
 
 - **Criterion 3 (MET, but only because of the 9-of-10 allowance).** A strict 10-of-10 would have missed in all three trials, because the test itself exceeds the free-tier quota. What I would do: re-measure latency with runs spaced about 9 seconds apart (7 runs a minute is the limit at 2 calls per run), and write the criterion that way. I stopped because the unit was out of time and the honest fix is a new measurement, not more code. I left the original criterion in place.
 - **The timeout change did not help.** I would revert it. It adds a thread and a billing risk with no demonstrated benefit. I kept it in the history, with the evidence above, because removing it would erase the diagnosis.
