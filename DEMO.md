@@ -1,45 +1,97 @@
-# Demo Day script (about 3 minutes, four beats)
+# Demo Day: steps and what to say (about 3 minutes, four beats)
 
-Written from the real numbers in `results/` and `criteria.md`. Say it in your own
-words; these are the facts to hit, with the time budget. Have open: the system
-ready to run, `criteria.md`, `logs/runs.jsonl`, `RUNNING.md`.
+Numbers are from `results/`, `criteria.md` and the README. The dialogue is a
+draft in first person: change the words, keep the numbers and the honest parts.
+Each live model run takes about 9 seconds, so talk while it runs.
 
-## 1. What I built (about 45 s)
+## Before you go on (offline)
 
-FitFindr is an agent that finds a thrifted item, suggests an outfit from your
-wardrobe, and writes a fit card. For the capstone I extended it with a run log:
-every run appends one JSON line to `logs/runs.jsonl` with the query, status,
-output, duration and token counts, and failed runs are logged too. Run it live:
-`python app.py ask 'vintage graphic tee under $30'`, then show the new line in the log.
+- Terminal open in the project folder, venv active (the prompt starts with `(.venv)`).
+- `.env` has your current key. Do not open `.env` on screen.
+- Do one warm-up run so you know the network and key work.
+- Tabs open: `criteria.md`, `logs/runs.jsonl`, `results/capstone_mine_before.md`,
+  `results/capstone_mine_after.md`, `RUNNING.md`.
+- Use single quotes around the query. In PowerShell, double quotes drop the `$30`.
 
-## 2. The standard I set (about 30 s)
+## Beat 1: what I built (about 45 s)
 
-Read the criteria with the number:
-1. Every run leaves exactly one record: a batch of 5 adds 5 lines, 5 of 5 trials.
-2. A classmate starts it alone from RUNNING.md: 2 of 2 testers, setup in 5 minutes, five runs in another 5, at least 4 of 5 fit cards. (Revised before results to a timed fresh-clone self-test: setup within 5 minutes, at least 4 of 5 fit cards, 3 of 3 trials.)
-3. Cost: at most $0.001 per run, which is $10 a day for 100 users making 100 runs each.
-4. Bad input does not crash: 5 of 5 inputs, no Traceback, a message naming the problem.
-5. The original behavior still works: 3 of 3 comparisons.
+**Run:**
+```powershell
+python app.py ask 'vintage graphic tee under $30'
+```
+Then show the log line it wrote:
+```powershell
+python -c "import runlog; print(runlog.read_runs()[-1])"
+```
 
-Say that I wrote them myself (Claude's first draft was superseded, see the README).
+**Say:** "FitFindr is an agent that finds a thrifted item, suggests an outfit from
+your wardrobe, and writes a fit card. For the capstone I added a run log. Every
+run, including a failed one, appends one line to a file with the query, the
+status, how long it took, and how many tokens it used. Here is the run I just did,
+and here is its line in the log: the status is ok, and these are the tokens. I
+built it this way because a failure that leaves no record looks the same as
+nobody using it."
 
-## 3. What the test found (about 60 s)
+## Beat 2: the standard I set (about 30 s)
 
-Name the real misses:
-- **Cost missed.** $0.00103, $0.00113 and $0.00114 a run against $0.001. About 83% of the cost was output tokens.
-- **Empty query.** `ask ""` fell into an interactive prompt and named no problem. My first check said 5 of 5, but it only checked for any output; the strict check showed 4 of 5 in every trial.
-- Criteria 1 and 5 held. Criterion 5 is easy by design (the item comes from search, not the model).
+**Show:** `criteria.md`, the section marked "mine".
 
-## 4. What I changed, whether it helped, what's still broken (about 45 s)
+**Say:** "I wrote five criteria, each with a number, before I ran any results.
+One: every run leaves exactly one record, a batch of five adds five lines, five
+trials out of five. Two: someone can start it from the instructions alone, setup
+in five minutes and at least four of five fit cards. Three: cost at most a tenth
+of a cent a run, which is ten dollars a day for a hundred users making a hundred
+runs each. Four: bad input never crashes it, five out of five. Five: the original
+behavior still works, three of three. I wrote these myself. Claude drafted a first
+set, and I replaced it. It's still in the file, marked superseded."
 
-- Capped the outfit suggestion at 60 words: cost fell to about $0.0005 a run, criterion 3 met with about 2x headroom.
-- `ask ""` now prints "Nothing to search for..." and still logs one record: criterion 4 went from 4/5 to 5/5.
-- Criterion 2 (revised to a timed fresh clone, because the classmate test comes after the deadline): 3 of 3 trials passed, setup 130, 146 and 174 s against a 300 s limit, 5 of 5 fit cards each time. A first attempt was void (empty key) and I said so.
-- Still broken, say it plainly: the real two-classmate test has not happened (my self-test only shows the commands work, not that a stranger can follow the text); the price is from third-party pages; I did not re-check fit-card quality after shortening outfits.
+## Beat 3: what the test found (about 60 s)
+
+**Run:**
+```powershell
+python app.py ask ' '
+```
+(One space inside the quotes. In PowerShell an empty `''` is dropped, and it would
+open the interactive prompt instead.) Then open the before and after results files.
+
+**Say:** "Two criteria missed. Cost: the target was a tenth of a cent, and my three
+trials came out at 0.103, 0.113 and 0.114 of a cent. About 83 percent of the cost
+was output tokens, because they cost more than eight times as much as input.
+Bad input: an empty query didn't give an error at all. It dropped into an
+interactive prompt and named no problem. My first check said five out of five,
+because it only looked for any output. When I ran it by hand I saw it wasn't a
+real message, tightened the check, and it was four out of five in every trial.
+The other three criteria held. Criterion five is easy by design, because the item
+comes from search and not from the model."
+
+## Beat 4: what I changed and what's still broken (about 45 s)
+
+**Show:** the 60-word line in `tools.py` (the `suggest_outfit` prompt), and the
+new message from the command in beat 3.
+
+**Say:** "I made two small changes. I capped the outfit suggestion at sixty words,
+and cost dropped to about a twentieth of a cent a run,
+so criterion three is met with about twice the headroom. And an empty query now
+prints 'Nothing to search for' and still logs a record, so criterion four went from
+four of five to five of five. For criterion two, the classmate test can only
+happen at Demo Day, so I revised it underneath the original to a timed fresh
+clone, and it passed three of three trials, setup under three minutes, five of
+five fit cards. What's still broken: the real classmate test hasn't happened, my
+self-test shows the commands work but not that a stranger can follow the text, the
+price I used is from third-party pages, and I didn't re-check fit-card quality
+after shortening the outfits."
+
+## If something breaks live
+
+- **A rate-limit pause message:** say "that's the free-tier pacing, it's normal".
+- **Model or network down:** show the last line in `logs/runs.jsonl` and say what
+  it would have printed. Don't re-run the cost trials live; they take 15 minutes.
 
 ## Peer testing (after the demo)
 
-- Swap RUNNING.md; start cold from the instructions alone (5 minutes max); then use it for 4 minutes: an ordinary input first, then an out-of-scope one.
-- Give back three things: WORKED / SURPRISED ME / COULDN'T FIGURE OUT.
-- When receiving feedback: write it down and ask one question. Do not defend.
-- Your testers need Python 3.12 and their own Gemini key (3.14 fails with `No module named 'mcp'`).
+- Swap `RUNNING.md`. Your tester starts cold from the instructions alone (5 minutes
+  max), then uses it for 4 minutes: an ordinary query first, then an out-of-scope one.
+- They give back three things: WORKED / SURPRISED ME / COULDN'T FIGURE OUT.
+- When you receive feedback: write it down and ask one question. Don't defend.
+- Your testers need Python 3.12 and their own Gemini key (3.14 fails with
+  `No module named 'mcp'`). Ask them their Python version before they start.
