@@ -141,7 +141,9 @@ def _ask_one(query, wardrobe, use_trace):
 def cmd_ask(args):
     from utils.data_loader import get_example_wardrobe, get_empty_wardrobe
     from agent import load_saved_wardrobe
+    import config
     import generate
+    import runlog
 
     if args.empty_wardrobe:
         wardrobe = get_empty_wardrobe()
@@ -150,7 +152,21 @@ def cmd_ask(args):
         wardrobe = load_saved_wardrobe(get_example_wardrobe())
 
     try:
-        if args.query:
+        if args.query is not None and not args.query.strip():
+            # Capstone: `ask ""` used to fall into the interactive prompt and
+            # print nothing about the problem. Say what is wrong, and still
+            # leave one record so a bad input is not an invisible run.
+            message = (
+                "Nothing to search for. Type what you're looking for, "
+                "for example: vintage graphic tee under $30"
+            )
+            print(f"\n  {message}\n")
+            runlog.log_run(
+                query=args.query, status="empty_search", output=message,
+                error=message, duration_s=0.0, cache_enabled=config.CACHE_ENABLED,
+                model_calls=0, prompt_tokens=0, output_tokens=0,
+            )
+        elif args.query:
             _ask_one(args.query, wardrobe, args.trace)
         else:
             print("Ask for something, or press Enter on an empty line to quit.\n")
