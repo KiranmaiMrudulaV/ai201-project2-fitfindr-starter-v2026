@@ -248,6 +248,17 @@ already built their own projects with the same setup, so what is tested is my
 instructions, not their machines. 10 minutes in total is reasonable and generous,
 and because it is generous, 4 of 5 fit cards is a fair bar.
 
+> **Revised in unit 9:** On a fresh clone, I follow only RUNNING.md and time it.
+> Setup finishes within 5 minutes and at least 4 of 5 runs of the RUNNING.md
+> query print a non-empty fit card (a `stopped:` message does not count), in
+> **3 of 3 trials**. Each trial uses a fresh clone in a new folder and a new
+> venv. I paste the API key by hand, and that step is inside the timer.
+>
+> **Why revised:** The two-classmate test can only happen at Demo Day, after the
+> capstone deadline. This revision checks whether I can get a fit card using only
+> RUNNING.md, though knowing the project makes it easier for me. The original
+> criterion above is unchanged.
+
 ## 3. One run stays cheap
 
 Using $0.30 per million input tokens and $2.50 per million output tokens (from
