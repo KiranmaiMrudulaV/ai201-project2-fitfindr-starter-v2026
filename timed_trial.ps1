@@ -55,9 +55,15 @@ $marks["pip install"] = [int]$watch.Elapsed.TotalSeconds
 Copy-Item .env.example .env
 
 # The human step. The wait is inside the timer.
-$secure = Read-Host "Paste your GEMINI_API_KEY now (hidden), then press Enter" -AsSecureString
-$key = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-    [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
+$key = ""
+while ($key.Length -lt 20) {
+    $secure = Read-Host "Paste your GEMINI_API_KEY now (hidden), then press Enter" -AsSecureString
+    $key = [Runtime.InteropServices.Marshal]::PtrToStringBSTR(
+        [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
+    if ($key.Length -lt 20) {
+        Write-Host "That was empty or too short ($($key.Length) characters). The timer is still running. Try pasting again (right-click pastes in most consoles)." -ForegroundColor Yellow
+    }
+}
 (Get-Content .env) -replace '^GEMINI_API_KEY=.*$', "GEMINI_API_KEY=$key" | Set-Content .env -Encoding utf8
 $key = $null
 $marks["key pasted"] = [int]$watch.Elapsed.TotalSeconds
