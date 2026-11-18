@@ -16,7 +16,7 @@ output, duration and token counts, and failed runs are logged too. Run it live:
 
 Read the criteria with the number:
 1. Every run leaves exactly one record: a batch of 5 adds 5 lines, 5 of 5 trials.
-2. A classmate starts it alone from RUNNING.md: 2 of 2 testers, setup in 5 minutes, five runs in another 5, at least 4 of 5 fit cards.
+2. A classmate starts it alone from RUNNING.md: 2 of 2 testers, setup in 5 minutes, five runs in another 5, at least 4 of 5 fit cards. (Revised before results to a timed fresh-clone self-test: setup within 5 minutes, at least 4 of 5 fit cards, 3 of 3 trials.)
 3. Cost: at most $0.001 per run, which is $10 a day for 100 users making 100 runs each.
 4. Bad input does not crash: 5 of 5 inputs, no Traceback, a message naming the problem.
 5. The original behavior still works: 3 of 3 comparisons.
@@ -34,7 +34,8 @@ Name the real misses:
 
 - Capped the outfit suggestion at 60 words: cost fell to about $0.0005 a run, criterion 3 met with about 2x headroom.
 - `ask ""` now prints "Nothing to search for..." and still logs one record: criterion 4 went from 4/5 to 5/5.
-- Still broken, say it plainly: criterion 2 is not scored yet (my dry run: 143 s setup, 5 of 5 fit cards, but that is not a test by a stranger); the price is from third-party pages; I did not re-check fit-card quality after shortening outfits.
+- Criterion 2 (revised to a timed fresh clone, because the classmate test comes after the deadline): 3 of 3 trials passed, setup 130, 146 and 174 s against a 300 s limit, 5 of 5 fit cards each time. A first attempt was void (empty key) and I said so.
+- Still broken, say it plainly: the real two-classmate test has not happened (my self-test only shows the commands work, not that a stranger can follow the text); the price is from third-party pages; I did not re-check fit-card quality after shortening outfits.
 
 ## Peer testing (after the demo)
 
